@@ -71,6 +71,7 @@ router.post('/metamask/verify', async (req, res) => {
             hasSignature: !!signature
         });
         return res.status(400).json({ 
+            success: false,
             error: 'Missing required fields',
             details: {
                 walletAddress: !walletAddress ? 'Wallet address is required' : undefined,
@@ -87,6 +88,7 @@ router.post('/metamask/verify', async (req, res) => {
         if (!user) {
             console.log('User not found in database');
             return res.status(400).json({ 
+                success: false,
                 error: 'Wallet not registered',
                 details: 'No user found with this wallet address'
             });
@@ -102,6 +104,7 @@ router.post('/metamask/verify', async (req, res) => {
         if (!user.nonce) {
             console.log('User has no nonce');
             return res.status(400).json({ 
+                success: false,
                 error: 'Invalid nonce',
                 details: 'User has no nonce associated with their account'
             });
@@ -121,6 +124,7 @@ router.post('/metamask/verify', async (req, res) => {
             if (recoveredAddress.toLowerCase() !== normalizedAddress) {
                 console.log('Signature verification failed');
                 return res.status(401).json({ 
+                    success: false,
                     error: 'Invalid signature',
                     details: 'The signature does not match the expected wallet address'
                 });
@@ -128,6 +132,7 @@ router.post('/metamask/verify', async (req, res) => {
         } catch (recoveryError) {
             console.error('Error recovering address:', recoveryError);
             return res.status(400).json({
+                success: false,
                 error: 'Signature recovery failed',
                 details: recoveryError.message
             });
@@ -142,16 +147,23 @@ router.post('/metamask/verify', async (req, res) => {
             }
         }
 
-        // Generate JWT token
-        const token = jwt.sign({ 
-            userId: user._id, 
+        // Generate JWT token with more detailed payload
+        const tokenPayload = {
+            userId: user._id,
             walletAddress: user.walletAddress,
-            role: user.role 
-        }, process.env.JWT_SECRET, { expiresIn: '7d' });
+            role: user.role,
+            timestamp: Date.now()
+        };
+
+        const token = jwt.sign(tokenPayload, process.env.JWT_SECRET, { 
+            expiresIn: '7d',
+            algorithm: 'HS256'
+        });
 
         console.log('Verification successful, generating response');
         // Return token and user data
         res.status(200).json({
+            success: true,
             message: 'MetaMask login successful',
             token,
             user: {
@@ -164,11 +176,37 @@ router.post('/metamask/verify', async (req, res) => {
     } catch (error) {
         console.error('Error in /metamask/verify:', error);
         res.status(500).json({ 
+            success: false,
             error: 'Server error',
             details: error.message
         });
     }
 });
+
+// Add a route to verify token validity
+router.get('/verify-token', auth, async (req, res) => {
+    try {
+        const user = req.user;
+        res.status(200).json({
+            success: true,
+            message: 'Token is valid',
+            user: {
+                _id: user._id,
+                walletAddress: user.walletAddress,
+                role: user.role,
+                name: user.name,
+            }
+        });
+    } catch (error) {
+        console.error('Token verification error:', error);
+        res.status(401).json({
+            success: false,
+            message: 'Token is not valid',
+            error: error.message
+        });
+    }
+});
+
 // Check if a wallet address is already registered
 router.post('/check-wallet', async (req, res) => {
     const { walletAddress } = req.body;

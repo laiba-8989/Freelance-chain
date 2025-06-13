@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNotifications } from '../../../context/NotificationContext';
-import { Link } from 'react-router-dom';
+import { useAuth } from '../../../AuthContext';
+import { Link, useNavigate } from 'react-router-dom';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { NotificationIcon } from '../../NotificationBell';
@@ -9,8 +10,16 @@ dayjs.extend(relativeTime);
 
 const NotificationPage = () => {
   const { notifications, isLoading, markAsRead, markAllAsRead } = useNotifications();
+  const { currentUser, isLoading: authLoading } = useAuth();
+  const navigate = useNavigate();
   const [filter, setFilter] = useState('all'); // 'all', 'unread', 'read'
   const [sortBy, setSortBy] = useState('newest'); // 'newest', 'oldest'
+
+  useEffect(() => {
+    if (!authLoading && !currentUser) {
+      navigate('/signin');
+    }
+  }, [currentUser, authLoading, navigate]);
 
   const filteredNotifications = notifications.filter(notification => {
     if (filter === 'all') return true;
@@ -56,12 +65,16 @@ const NotificationPage = () => {
     return null;
   };
 
-  if (isLoading) {
+  if (isLoading || authLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-[#f8f9fa]">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#6D9773]"></div>
       </div>
     );
+  }
+
+  if (!currentUser) {
+    return null; // Don't render anything while redirecting
   }
 
   return (
