@@ -537,7 +537,7 @@ exports.releasePayment = async (req, res) => {
 exports.rejectWork = async (req, res) => {
     try {
         const { id } = req.params;
-        const { rejectionReason, transactionHash } = req.body;
+        const { rejectionReason, transactionHash, disputeTransactionHash } = req.body;
 
         if (!rejectionReason) {
             return res.status(400).json({
@@ -546,9 +546,14 @@ exports.rejectWork = async (req, res) => {
             });
         }
 
-        // Find contract by contractId (number) instead of _id
-        const contract = await Contract.findOne({ contractId: parseInt(id) });
-        
+        // Find the contract by either _id or contractId
+        const contract = await Contract.findOne({
+            $or: [
+                { _id: id },
+                { contractId: id }
+            ]
+        });
+
         if (!contract) {
             return res.status(404).json({
                 success: false,
@@ -557,42 +562,24 @@ exports.rejectWork = async (req, res) => {
         }
 
         // Update contract status and rejection details
-        const updatedContract = await Contract.findOneAndUpdate(
-            { contractId: parseInt(id) },
-            {
-                $set: {
-                    status: 'disputed',
-                    rejectionReason: rejectionReason,
-                    rejectionTransactionHash: transactionHash,
-                    updatedAt: new Date()
-                }
-            },
-            { new: true }
-        ).populate('client', 'name walletAddress')
-         .populate('freelancer', 'name walletAddress')
-         .populate('job', 'title description');
+        contract.status = 'disputed';
+        contract.rejectionReason = rejectionReason;
+        contract.transactionHash = transactionHash;
+        contract.disputeTransactionHash = disputeTransactionHash;
+        await contract.save();
 
-        if (!updatedContract) {
-            return res.status(500).json({
-                success: false,
-                error: 'Failed to update contract status'
-            });
-        }
+        // Create notification for admin
+        await notificationService.createNotification({
+            type: 'dispute',
+            title: 'New Contract Dispute',
+            content: `Contract ${contract._id} has been disputed. Reason: ${rejectionReason}`,
+            isAdmin: true,
+            link: `/admin/disputes/${contract._id}`
+        });
 
-        // Create a notification for the admin
-        await notificationService.notify(
-            null, // No specific user ID for admin notifications
-            'dispute',
-            `Contract #${updatedContract.contractId} has been rejected by the client. Reason: ${rejectionReason}`,
-            `/admin/disputes/${updatedContract._id}`,
-            null, // No socket.io instance in this context
-            req.user._id, // Sender ID (the client who rejected)
-            true // This is an admin notification
-        );
-
-        res.json({
+        res.status(200).json({
             success: true,
-            data: updatedContract
+            data: contract
         });
     } catch (err) {
         console.error('Error in rejectWork:', err);

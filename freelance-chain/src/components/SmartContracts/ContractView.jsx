@@ -551,30 +551,64 @@ const ContractView = () => {
 
     setRejectLoading(true);
     try {
-      // Call the smart contract rejectWork function
+      // Get contract instance
       const contractInstance = new ethers.Contract(
         contract.contractAddress,
         CONTRACT_ABI,
         signer
       );
 
-      const tx = await contractInstance.rejectWork(contract.contractId, rejectReason);
-      await tx.wait();
+      // Check contract status on chain - Should be WorkSubmitted
+      const currentContractState = await contractInstance.getContract(contract.contractId);
+      if (currentContractState.status.toString() !== '3') { // 3 is WorkSubmitted
+        toast.error(`Work must be submitted before it can be rejected. Current status: ${currentContractState.status}`);
+        setRejectLoading(false);
+        return;
+      }
 
-      // Update the backend about the rejection
+      // First call rejectWork to log the reason
+      const rejectTx = await contractInstance.rejectWork(contract.contractId, rejectReason);
+      await rejectTx.wait();
+
+      // Get dispute fee from contract
+      const disputeFee = await contractInstance.disputeFee();
+
+      // Then call raiseDispute to change status to disputed
+      const disputeTx = await contractInstance.raiseDispute(contract.contractId, {
+        value: disputeFee
+      });
+      await disputeTx.wait();
+
+      // Update the backend about the rejection and dispute
       await contractService.rejectWork(contract.contractId, {
         rejectionReason: rejectReason,
-        transactionHash: tx.hash
+        transactionHash: rejectTx.hash,
+        disputeTransactionHash: disputeTx.hash
       });
 
-      toast.success('Work rejected successfully');
+      toast.success('Work rejected and dispute raised successfully');
       setShowRejectModal(false);
       setRejectReason('');
       // Refetch contract data
       fetchContracts(false);
     } catch (err) {
       console.error('Error rejecting work:', err);
-      toast.error('Failed to reject work: ' + (err.message || 'Unknown error'));
+      let errorMessage = 'Failed to reject work.';
+      
+      if (err.code === 'UNPREDICTABLE_GAS_LIMIT') {
+        errorMessage = 'Failed to estimate gas. Please try again or contact support.';
+      } else if (err.code === 'CALL_EXCEPTION') {
+        errorMessage = 'Transaction failed on chain. Check contract state and requirements.';
+        if (err.error && err.error.message) { errorMessage += ` Error: ${err.error.message}`; }
+        else if (err.message && err.message.includes('execution reverted')) { 
+          const revertReason = err.message.split('execution reverted:')[1];
+          errorMessage += revertReason ? ` Revert Reason: ${revertReason.trim()}` : ' No specific revert reason.';
+        }
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      
+      toast.error(errorMessage);
     } finally {
       setRejectLoading(false);
     }

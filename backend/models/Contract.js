@@ -69,7 +69,11 @@ const contractSchema = new mongoose.Schema({
     },
     transactionHash: {
         type: String,
-        required: true
+        required: false
+    },
+    disputeTransactionHash: {
+        type: String,
+        required: false
     },
     workHash: {
         type: String

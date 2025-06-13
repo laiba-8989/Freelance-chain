@@ -263,7 +263,7 @@ const adminController = {
   getDisputes: async (req, res) => {
     try {
       const disputes = await Contract.find({
-        status: { $in: ['disputed', 'work_rejected'] }
+        status: 'disputed'
       })
       .populate('client', 'name walletAddress')
       .populate('freelancer', 'name walletAddress')
@@ -282,7 +282,8 @@ const adminController = {
         disputeRaisedBy: 'Client',
         disputeRaisedAt: contract.updatedAt,
         bidAmount: contract.bidAmount,
-        workHash: contract.workHash
+        workHash: contract.workHash,
+        rejectionTransactionHash: contract.rejectionTransactionHash
       }));
 
       res.json({
