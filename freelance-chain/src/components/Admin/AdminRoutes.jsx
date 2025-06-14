@@ -5,8 +5,10 @@ import Dashboard from './Dashboard';
 import Users from './Users';
 import Jobs from './Jobs';
 import Contracts from './Contracts';
+import ContractDetails from './ContractDetails';
 import Notifications from './Notifications';
 import DataExport from './DataExport';
+import Disputes from './Disputes';
 import AdminAccessGuard from './AdminAccessGuard';
 
 const AdminRoutes = () => {
@@ -19,6 +21,9 @@ const AdminRoutes = () => {
           <Route path="users" element={<Users />} />
           <Route path="jobs" element={<Jobs />} />
           <Route path="contracts" element={<Contracts />} />
+          <Route path="contracts/:contractId" element={<ContractDetails />} />
+          <Route path="disputes" element={<Disputes />} />
+          <Route path="disputes/:contractId" element={<Disputes />} />
           <Route path="notifications" element={<Notifications />} />
           <Route path="export" element={<DataExport />} />
         </Route>

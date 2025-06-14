@@ -35,7 +35,7 @@ const Layout = () => {
         <Outlet /> {/* This renders the matched child route */}
       </main>
       {!shouldHideFooter && <Footer />}
-      {!shouldHideFooter && <Footer />}
+      {/* {!shouldHideFooter && <Footer />} */}
     </div>
   );
 };

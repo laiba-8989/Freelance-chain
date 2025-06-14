@@ -84,23 +84,26 @@ const updateNotificationSettings = async (userId, settings) => {
 };
 
 // Create and send notification
-const notify = async (userId, type, content, link, io, senderId = null) => {
+const notify = async (userId, type, content, link, io, senderId = null, isAdmin = false) => {
   let formattedContent = content;
   try {
-    // Get user's notification settings
-    const settings = await getUserNotificationSettings(userId);
-    if (!settings) {
-      console.warn(`No notification settings found for user: ${userId}`);
-      return null;
+    // For admin notifications, skip user settings check
+    if (!isAdmin) {
+      // Get user's notification settings
+      const settings = await getUserNotificationSettings(userId);
+      if (!settings) {
+        console.warn(`No notification settings found for user: ${userId}`);
+        return null;
+      }
+
+      // Check if push notifications are enabled for this type
+      const shouldSendPush = settings.pushNotifications.enabled && 
+                            settings.pushNotifications.types[type];
+
+      // Check if email notifications are enabled for this type
+      const shouldSendEmail = settings.emailNotifications.enabled && 
+                             settings.emailNotifications.types[type];
     }
-
-    // Check if push notifications are enabled for this type
-    const shouldSendPush = settings.pushNotifications.enabled && 
-                          settings.pushNotifications.types[type];
-
-    // Check if email notifications are enabled for this type
-    const shouldSendEmail = settings.emailNotifications.enabled && 
-                           settings.emailNotifications.types[type];
 
     let sender = null;
     
@@ -128,6 +131,9 @@ const notify = async (userId, type, content, link, io, senderId = null) => {
           case 'work_approved':
             formattedContent = `${sender.name} approved your submitted work`;
             break;
+          case 'dispute':
+            formattedContent = `${sender.name} rejected work: ${content}`;
+            break;
           default:
             formattedContent = content;
         }
@@ -136,7 +142,8 @@ const notify = async (userId, type, content, link, io, senderId = null) => {
 
     // Create notification in database
     const notification = new Notification({
-      userId,
+      userId: isAdmin ? null : userId,
+      isAdmin,
       type,
       content: formattedContent,
       link,
@@ -149,8 +156,8 @@ const notify = async (userId, type, content, link, io, senderId = null) => {
 
     await notification.save();
 
-    // Send real-time notification if enabled
-    if (shouldSendPush) {
+    // Send real-time notification if enabled and not admin
+    if (!isAdmin && shouldSendPush) {
       const socketId = getUserSocketId(userId);
       if (socketId && io) {
         try {
@@ -163,8 +170,8 @@ const notify = async (userId, type, content, link, io, senderId = null) => {
       }
     }
 
-    // Send email notification if enabled
-    if (shouldSendEmail && transporter) {
+    // Send email notification if enabled and not admin
+    if (!isAdmin && shouldSendEmail && transporter) {
       try {
         const user = await User.findById(userId);
         if (user && user.email) {

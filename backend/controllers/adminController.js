@@ -10,6 +10,7 @@ const Contract = require('../models/Contract');
 // const { createObjectCsvWriter } = require('csv-writer');
 const path = require('path');
 const notificationService = require('../services/notificationService');
+const Notification = require('../models/Notification');
 
 const adminController = {
   // Dashboard stats
@@ -179,8 +180,9 @@ const adminController = {
       if (status) query.status = status;
 
       const contracts = await Contract.find(query)
-        .populate('clientId', 'name walletAddress')
-        .populate('freelancerId', 'name walletAddress')
+        .populate('client', 'name walletAddress')
+        .populate('freelancer', 'name walletAddress')
+        .populate('job', 'title description')
         .skip((page - 1) * limit)
         .limit(parseInt(limit))
         .sort({ createdAt: -1 });
@@ -205,6 +207,35 @@ const adminController = {
     }
   },
 
+  getContractDetails: async (req, res) => {
+    try {
+      const { contractId } = req.params;
+
+      const contract = await Contract.findById(contractId)
+        .populate('client', 'name walletAddress')
+        .populate('freelancer', 'name walletAddress')
+        .populate('job', 'title description');
+
+      if (!contract) {
+        return res.status(404).json({
+          success: false,
+          message: 'Contract not found'
+        });
+      }
+
+      res.json({
+        success: true,
+        contract
+      });
+    } catch (error) {
+      console.error('Error getting contract details:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error fetching contract details'
+      });
+    }
+  },
+
   updateContractStatus: async (req, res) => {
     try {
       const { contractId } = req.params;
@@ -214,8 +245,8 @@ const adminController = {
         contractId,
         { status },
         { new: true }
-      ).populate('clientId', 'name walletAddress')
-       .populate('freelancerId', 'name walletAddress');
+      ).populate('client', 'name walletAddress')
+       .populate('freelancer', 'name walletAddress');
 
       if (!contract) {
         return res.status(404).json({ success: false, message: 'Contract not found' });
@@ -225,6 +256,170 @@ const adminController = {
     } catch (error) {
       console.error('Error updating contract status:', error);
       res.status(500).json({ success: false, message: 'Error updating contract status' });
+    }
+  },
+
+  // Dispute management
+  getDisputes: async (req, res) => {
+    try {
+      const disputes = await Contract.find({
+        status: 'disputed'
+      })
+      .populate('client', 'name walletAddress')
+      .populate('freelancer', 'name walletAddress')
+      .populate('job', 'title description')
+      .sort({ updatedAt: -1 });
+
+      // Transform the contracts into disputes format
+      const formattedDisputes = disputes.map(contract => ({
+        _id: contract._id,
+        contractId: contract.contractId,
+        job: contract.job,
+        client: contract.client,
+        freelancer: contract.freelancer,
+        status: contract.status,
+        disputeReason: contract.rejectionReason || 'Work rejected',
+        disputeRaisedBy: 'Client',
+        disputeRaisedAt: contract.updatedAt,
+        bidAmount: contract.bidAmount,
+        workHash: contract.workHash,
+        rejectionTransactionHash: contract.rejectionTransactionHash
+      }));
+
+      res.json({
+        success: true,
+        data: formattedDisputes
+      });
+    } catch (error) {
+      console.error('Error getting disputes:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error fetching disputes'
+      });
+    }
+  },
+
+  getDisputeDetails: async (req, res) => {
+    try {
+      const { contractId } = req.params;
+
+      const contract = await Contract.findOne({
+        _id: contractId,
+        status: { $in: ['disputed', 'work_rejected'] }
+      })
+      .populate('client', 'name walletAddress')
+      .populate('freelancer', 'name walletAddress')
+      .populate('job', 'title description');
+
+      if (!contract) {
+        return res.status(404).json({
+          success: false,
+          message: 'Dispute not found'
+        });
+      }
+
+      // Format the dispute details
+      const disputeDetails = {
+        _id: contract._id,
+        contractId: contract.contractId,
+        job: contract.job,
+        client: contract.client,
+        freelancer: contract.freelancer,
+        status: contract.status,
+        disputeReason: contract.rejectionReason || 'Work rejected',
+        disputeRaisedBy: 'Client',
+        disputeRaisedAt: contract.updatedAt,
+        bidAmount: contract.bidAmount,
+        workHash: contract.workHash,
+        rejectionTransactionHash: contract.rejectionTransactionHash
+      };
+
+      res.json({
+        success: true,
+        data: disputeDetails
+      });
+    } catch (error) {
+      console.error('Error getting dispute details:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error fetching dispute details'
+      });
+    }
+  },
+
+  resolveDispute: async (req, res) => {
+    try {
+      const { contractId } = req.params;
+      const { clientShare, freelancerShare, adminNote } = req.body;
+
+      if (!clientShare || !freelancerShare || !adminNote) {
+        return res.status(400).json({
+          success: false,
+          message: 'Client share, freelancer share, and admin note are required'
+        });
+      }
+
+      const contract = await Contract.findById(contractId)
+        .populate('client', 'name walletAddress')
+        .populate('freelancer', 'name walletAddress');
+
+      if (!contract) {
+        return res.status(404).json({
+          success: false,
+          message: 'Contract not found'
+        });
+      }
+
+      if (contract.status !== 'disputed') {
+        return res.status(400).json({
+          success: false,
+          message: 'This contract is not in dispute'
+        });
+      }
+
+      // Update contract status
+      contract.status = 'completed';
+      contract.disputeResolution = {
+        clientShare,
+        freelancerShare,
+        adminNote,
+        resolvedBy: req.adminUser._id,
+        resolvedAt: new Date()
+      };
+      await contract.save();
+
+      // Send notifications to both parties
+      const notificationMessage = `Dispute resolved: ${adminNote}. Client receives ${clientShare}% and freelancer receives ${freelancerShare}% of the escrow amount.`;
+      
+      await notificationService.notify(
+        contract.client._id,
+        'dispute_resolved',
+        notificationMessage,
+        `/contracts/${contract._id}`,
+        req.app.get('io'),
+        req.adminUser._id
+      );
+
+      await notificationService.notify(
+        contract.freelancer._id,
+        'dispute_resolved',
+        notificationMessage,
+        `/contracts/${contract._id}`,
+        req.app.get('io'),
+        req.adminUser._id
+      );
+
+      res.json({
+        success: true,
+        message: 'Dispute resolved successfully',
+        contract
+      });
+    } catch (error) {
+      console.error('Error resolving dispute:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error resolving dispute'
+      });
     }
   },
 
@@ -451,6 +646,66 @@ const adminController = {
       res.status(500).json({ 
         success: false, 
         message: 'Error sending system notification' 
+      });
+    }
+  },
+
+  // Add rejectWork function
+  rejectWork: async (req, res) => {
+    try {
+      const { contractId } = req.params;
+      const { rejectionReason, transactionHash } = req.body;
+
+      if (!rejectionReason) {
+        return res.status(400).json({
+          success: false,
+          message: 'Rejection reason is required'
+        });
+      }
+
+      // Find the contract
+      const contract = await Contract.findById(contractId)
+        .populate('client', 'name email walletAddress')
+        .populate('freelancer', 'name email walletAddress')
+        .populate('job', 'title description');
+
+      if (!contract) {
+        return res.status(404).json({
+          success: false,
+          message: 'Contract not found'
+        });
+      }
+
+      // Update contract status and add rejection details
+      contract.status = 'WorkRejected';
+      contract.rejectionDetails = {
+        reason: rejectionReason,
+        rejectedAt: new Date(),
+        transactionHash
+      };
+
+      await contract.save();
+
+      // Send notification to freelancer
+      await Notification.create({
+        recipient: contract.freelancer._id,
+        sender: contract.client._id,
+        type: 'work_rejected',
+        content: `Your work for "${contract.job.title}" has been rejected. Reason: ${rejectionReason}`,
+        link: `/contracts/${contract._id}`
+      });
+
+      res.json({
+        success: true,
+        message: 'Work rejected successfully',
+        contract
+      });
+    } catch (error) {
+      console.error('Error rejecting work:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error rejecting work',
+        error: error.message
       });
     }
   }

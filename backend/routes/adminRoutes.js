@@ -107,7 +107,14 @@ router.patch('/jobs/:jobId/status', validateAdminWallet, adminController.updateJ
 
 // Contract management
 router.get('/contracts', validateAdminWallet, adminController.getContracts);
+router.get('/contracts/:contractId', validateAdminWallet, adminController.getContractDetails);
 router.patch('/contracts/:contractId/status', validateAdminWallet, adminController.updateContractStatus);
+router.post('/contracts/:contractId/reject', validateAdminWallet, adminController.rejectWork);
+
+// Dispute management
+router.get('/disputes', validateAdminWallet, adminController.getDisputes);
+router.get('/disputes/:contractId', validateAdminWallet, adminController.getDisputeDetails);
+router.post('/disputes/:contractId/resolve', validateAdminWallet, adminController.resolveDispute);
 
 // Data export
 router.get('/export/:type', validateAdminWallet, adminController.exportData);

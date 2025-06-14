@@ -1,67 +1,39 @@
-import React, { useEffect, useState, useRef } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
-import { useWeb3 } from '../../context/useWeb3';
+import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useWeb3 } from '../../context/Web3Context';
+import axios from 'axios';
 import { toast } from 'react-hot-toast';
-import { api } from '../../services/api';
-
-// Array of admin wallet addresses
-const ADMIN_WALLET_ADDRESSES = [
-  '0x3Ff804112919805fFB8968ad81dBb23b32e8F3f1',
-  '0x1a16d8976a56F7EFcF2C8f861C055badA335fBdc'
-];
 
 const AdminAccessGuard = ({ children }) => {
-  const { account, isConnected, connectWallet } = useWeb3();
   const navigate = useNavigate();
-  const location = useLocation();
-  const [isChecking, setIsChecking] = useState(true);
-  const [isVerified, setIsVerified] = useState(false);
-  const [hasAttemptedConnect, setHasAttemptedConnect] = useState(false);
-  const isMounted = useRef(true);
-  const connectionAttempts = useRef(0);
-  const verificationTimeout = useRef(null);
-  const previousPath = useRef(location.pathname);
+  const { account, connectWallet, isConnected } = useWeb3();
+  const [isVerifying, setIsVerifying] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
 
-  // Check if user is already verified
   useEffect(() => {
+    checkAdminAccess();
+  }, [account]);
+
     const checkExistingVerification = () => {
-      const isAdmin = localStorage.getItem('isAdmin') === 'true';
-      const adminUser = localStorage.getItem('adminUser');
-      const token = localStorage.getItem('authToken');
-      
-      if (isAdmin && adminUser && token) {
-        setIsVerified(true);
-        setIsChecking(false);
-        if (location.pathname === '/signin') {
-          navigate('/admin/dashboard', { replace: true });
-        }
-      }
-    };
-
-    checkExistingVerification();
-  }, [location.pathname, navigate]);
-
-  useEffect(() => {
-    isMounted.current = true;
-    return () => {
-      isMounted.current = false;
-      if (verificationTimeout.current) {
-        clearTimeout(verificationTimeout.current);
-      }
-    };
-  }, []);
+    const verifiedAdmin = localStorage.getItem('verifiedAdmin');
+    const verifiedWallet = localStorage.getItem('verifiedWallet');
+    const authToken = localStorage.getItem('authToken');
+    
+    if (verifiedAdmin && verifiedWallet === account && authToken) {
+      setIsAdmin(true);
+      setIsVerifying(false);
+      return true;
+    }
+    return false;
+  };
 
   const handleWalletConnection = async () => {
     try {
-      const connectedAddress = await connectWallet();
-      if (!connectedAddress) {
-        throw new Error('Failed to connect wallet');
-      }
-      return connectedAddress;
+      await connectWallet();
     } catch (error) {
       console.error('Wallet connection error:', error);
-      toast.error('Failed to connect wallet. Please try again.');
-      throw error;
+      toast.error('Failed to connect wallet');
+      navigate('/');
     }
   };
 
@@ -69,172 +41,83 @@ const AdminAccessGuard = ({ children }) => {
     try {
       const token = localStorage.getItem('authToken');
       if (!token) {
-        throw new Error('Authentication required');
+        throw new Error('No authentication token found');
       }
 
-      const response = await api.get('/api/admin/verify', {
+      const response = await axios.get('http://localhost:5000/api/admin/verify', {
         headers: {
           'Authorization': `Bearer ${token}`
         },
         params: {
-          walletAddress: walletAddress.toLowerCase().trim()
+          walletAddress
         }
       });
 
-      if (!response.data.success || !response.data.isAdmin) {
-        throw new Error(response.data.message || 'Admin verification failed');
+      if (response.data.success && response.data.isAdmin) {
+        localStorage.setItem('verifiedAdmin', 'true');
+        localStorage.setItem('verifiedWallet', walletAddress);
+        setIsAdmin(true);
+        return true;
       }
-
-      // Set admin state in localStorage
-      localStorage.setItem('isAdmin', 'true');
-      if (response.data.user) {
-        localStorage.setItem('adminUser', JSON.stringify(response.data.user));
-      }
-
-      // Dispatch a custom event to notify other components
-      window.dispatchEvent(new Event('adminStateChanged'));
-
-      return true;
+      return false;
     } catch (error) {
       console.error('Admin verification error:', error);
-      throw error;
+      // If token is invalid or expired, clear stored data
+      if (error.response?.status === 401) {
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('verifiedAdmin');
+        localStorage.removeItem('verifiedWallet');
+      }
+      return false;
     }
   };
 
   const handleNavigation = (path) => {
-    if (path === previousPath.current) {
-      return;
-    }
-    previousPath.current = path;
-    navigate(path, { replace: true });
+    navigate(path);
   };
 
   const checkAdminAccess = async () => {
-    try {
-      // If already verified, no need to check again
-      if (isVerified) {
+    setIsVerifying(true);
+
+    // First check if we have stored verification
+    if (checkExistingVerification()) {
+      setIsVerifying(false);
         return;
       }
 
-      // Handle wallet connection
-      if (!isConnected || !account) {
-        if (!hasAttemptedConnect && connectionAttempts.current === 0) {
-          setHasAttemptedConnect(true);
-          connectionAttempts.current += 1;
-          
-          try {
+    // If no wallet is connected, prompt connection
+    if (!isConnected) {
             await handleWalletConnection();
-            // After connecting, let the effect run again with the new account
-            return;
-          } catch (error) {
-            if (isMounted.current) {
-              setIsChecking(false);
-              handleNavigation('/');
-            }
-            return;
-          }
-        } else {
-          if (isMounted.current) {
-            setIsChecking(false);
-            handleNavigation('/');
-          }
           return;
         }
-      }
 
-      // Only proceed with verification if we have an account
-      const normalizedUserAddress = account.toLowerCase().trim();
-      
-      // Check if the connected wallet is in the admin list
-      const isAdminWallet = ADMIN_WALLET_ADDRESSES.some(
-        adminAddress => adminAddress.toLowerCase().trim() === normalizedUserAddress
-      );
-
-      if (!isAdminWallet) {
-        toast.error('Access denied: Invalid admin wallet address');
-        if (isMounted.current) {
-          setIsChecking(false);
-          handleNavigation('/');
-        }
+    // Verify admin status
+    const isVerified = await verifyAdminStatus(account);
+    
+    if (!isVerified) {
+      toast.error('Access denied: Admin privileges required');
+      navigate('/');
         return;
       }
 
-      // Verify admin status with backend
-      await verifyAdminStatus(normalizedUserAddress);
-
-      if (isMounted.current) {
-        setIsVerified(true);
-        setIsChecking(false);
-        
-        // Force immediate navigation to admin dashboard
-        if (location.pathname === '/signin') {
-          window.location.href = '/admin/dashboard';
-        }
-      }
-    } catch (error) {
-      console.error('Error checking admin access:', error);
-      
-      // Handle specific error cases
-      if (error.message === 'Authentication required') {
-        toast.error('Please sign in first');
-      } else if (error.response?.status === 401) {
-        toast.error('Session expired. Please sign in again.');
-        localStorage.removeItem('authToken');
-        localStorage.removeItem('isAdmin');
-        localStorage.removeItem('adminUser');
-        // Dispatch event to notify other components
-        window.dispatchEvent(new Event('adminStateChanged'));
-      } else {
-        toast.error(error.message || 'Error verifying admin status');
-      }
-
-      if (isMounted.current) {
-        setIsChecking(false);
-        handleNavigation('/');
-      }
-    }
+    setIsVerifying(false);
   };
 
-  useEffect(() => {
-    // Clear any existing timeout
-    if (verificationTimeout.current) {
-      clearTimeout(verificationTimeout.current);
-    }
-
-    // Only run if not already verified and not currently checking
-    if (!isVerified && isChecking) {
-      // Add a small delay to ensure wallet connection is ready
-      verificationTimeout.current = setTimeout(() => {
-        checkAdminAccess();
-      }, 1000);
-    }
-
-    return () => {
-      if (verificationTimeout.current) {
-        clearTimeout(verificationTimeout.current);
-      }
-    };
-  }, [account, isConnected, hasAttemptedConnect, isVerified, location.pathname]);
-
-  // If checking, show loading state
-  if (isChecking) {
+  if (isVerifying) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100">
-        <div className="max-w-md w-full p-6 bg-white rounded-lg shadow-lg text-center">
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">Verifying Admin Access</h2>
-          <p className="text-gray-600 mb-6">Please wait while we verify your admin status...</p>
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto"></div>
+      <div className="flex items-center justify-center min-h-screen bg-gray-100">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-green-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Verifying admin access...</p>
         </div>
       </div>
     );
   }
 
-  // If not verified, don't render anything (already navigated away)
-  if (!isVerified) {
+  if (!isAdmin) {
     return null;
   }
 
-  // If verified, render children
   return children;
 };
 

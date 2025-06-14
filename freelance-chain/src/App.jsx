@@ -73,8 +73,8 @@ const App = () => {
   return (
     <QueryClientProvider client={queryClient}>
       <Tooltip.Provider>
-        <NotificationProvider>
-          <Web3Provider>
+        <Web3Provider>
+          <NotificationProvider>
             <ContractProvider>
               {/* Notification systems */}
               <HotToaster position="top-right" />
@@ -223,8 +223,8 @@ const App = () => {
                 <Route path="/admin/*" element={<AdminRoutes />} />
               </Routes>
             </ContractProvider>
-          </Web3Provider>
-        </NotificationProvider>
+          </NotificationProvider>
+        </Web3Provider>
       </Tooltip.Provider>
     </QueryClientProvider>
   );

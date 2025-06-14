@@ -68,14 +68,14 @@ const validateAdminWallet = async (req, res, next) => {
       });
     }
 
-    // Validate wallet address
-    const walletAddress = req.query.walletAddress || req.body.walletAddress;
-    console.log('Wallet address from request:', walletAddress);
+    // Validate wallet address from x-admin-wallet header
+    const walletAddress = req.header('x-admin-wallet');
+    console.log('Wallet address from header:', walletAddress);
 
     if (!walletAddress) {
       return res.status(401).json({
         success: false,
-        message: 'Wallet address is required'
+        message: 'Admin wallet address is required'
       });
     }
 

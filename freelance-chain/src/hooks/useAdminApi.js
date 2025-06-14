@@ -1,102 +1,79 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import axios from 'axios';
 import { toast } from 'react-hot-toast';
 import { useWeb3 } from '../context/Web3Context';
+import { useState, useEffect } from 'react';
 
-const API_BASE_URL = 'http://localhost:5000/api/admin';
+const API_BASE_URL = 'http://localhost:5000/api';
 
 export const useAdminApi = () => {
-  const queryClient = useQueryClient();
   const { account } = useWeb3();
 
-  // Helper function to get request config
   const getRequestConfig = (method = 'get', data = null) => {
     const token = localStorage.getItem('authToken');
     if (!token) {
       throw new Error('No authentication token found');
     }
 
-    if (!account) {
-      throw new Error('No wallet connected');
-    }
-
     const config = {
       method,
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
+        'Authorization': `Bearer ${token}`,
+        'x-admin-wallet': account
+      },
+      params: {
+        walletAddress: account
       }
     };
 
-    // Add wallet address to request body for all requests
-    if (method.toLowerCase() === 'get') {
-      config.params = { walletAddress: account.toLowerCase() };
-    } else {
-      config.data = { walletAddress: account.toLowerCase(), ...(data || {}) };
+    if (data) {
+      config.data = data;
     }
 
     return config;
   };
 
-  // Dashboard Stats
   const useDashboardStats = () => {
     return useQuery({
-      queryKey: ['adminStats'],
+      queryKey: ['adminDashboardStats'],
       queryFn: async () => {
-        try {
-          const response = await axios({
-            url: `${API_BASE_URL}/dashboard/stats`,
-            ...getRequestConfig()
-          });
-          return response.data.data;
-        } catch (error) {
-          console.error('Dashboard stats error:', error.response?.data);
-          throw error;
-        }
-      }
+        const response = await axios('http://localhost:5000/api/admin/dashboard/stats', getRequestConfig());
+        return response.data.data;
+      },
+      enabled: !!account
     });
   };
 
-  // Users
   const useUsers = (page = 1, filters = {}) => {
     return useQuery({
       queryKey: ['adminUsers', page, filters],
       queryFn: async () => {
-        try {
-          const response = await axios({
-            url: `${API_BASE_URL}/users`,
-            ...getRequestConfig('get'),
-            params: {
-              page,
-              limit: 10,
-              ...filters
-            }
-          });
-          return response.data.data;
-        } catch (error) {
-          console.error('Users fetch error:', error.response?.data);
-          throw error;
-        }
-      }
+        const response = await axios('http://localhost:5000/api/admin/users', {
+          ...getRequestConfig(),
+          params: {
+            ...getRequestConfig().params,
+            page,
+            limit: 10,
+            ...filters
+          }
+        });
+        return response.data.data;
+      },
+      enabled: !!account
     });
   };
 
   const useUpdateUserStatus = () => {
     return useMutation({
       mutationFn: async ({ userId, status }) => {
-        try {
-          const response = await axios({
-            url: `${API_BASE_URL}/users/${userId}/status`,
-            ...getRequestConfig('patch', { status })
-          });
-          return response.data;
-        } catch (error) {
-          console.error('Update user status error:', error.response?.data);
-          throw error;
-        }
+        const response = await axios(
+          `http://localhost:5000/api/admin/users/${userId}/status`,
+          getRequestConfig('patch', { status })
+        );
+        return response.data;
       },
       onSuccess: () => {
-        queryClient.invalidateQueries(['adminUsers']);
         toast.success('User status updated successfully');
       },
       onError: (error) => {
@@ -105,52 +82,124 @@ export const useAdminApi = () => {
     });
   };
 
-  // Jobs
   const useJobs = (page = 1, filters = {}) => {
     return useQuery({
       queryKey: ['adminJobs', page, filters],
       queryFn: async () => {
-        const response = await axios({
-          url: `${API_BASE_URL}/jobs`,
-          ...getRequestConfig('get'),
+        const response = await axios('http://localhost:5000/api/admin/jobs', {
+          ...getRequestConfig(),
           params: {
+            ...getRequestConfig().params,
             page,
             limit: 10,
             ...filters
           }
         });
         return response.data.data;
-      }
+      },
+      enabled: !!account
     });
   };
 
-  // Contracts
   const useContracts = (page = 1, filters = {}) => {
     return useQuery({
       queryKey: ['adminContracts', page, filters],
       queryFn: async () => {
-        const response = await axios({
-          url: `${API_BASE_URL}/contracts`,
-          ...getRequestConfig('get'),
+        const response = await axios('http://localhost:5000/api/admin/contracts', {
+          ...getRequestConfig(),
           params: {
+            ...getRequestConfig().params,
             page,
             limit: 10,
             ...filters
           }
         });
         return response.data.data;
+      },
+      enabled: !!account
+    });
+  };
+
+  const useDisputes = () => {
+    const [disputes, setDisputes] = useState([]);
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState(null);
+
+    const fetchDisputes = async () => {
+      if (!account) return;
+      
+      setIsLoading(true);
+      setError(null);
+      
+      try {
+        const response = await axios.get(`${API_BASE_URL}/admin/disputes`, {
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+            'x-admin-wallet': account
+          }
+        });
+
+        if (response.data.success) {
+          setDisputes(response.data.data.disputes);
+        } else {
+          setError(response.data.message || 'Failed to fetch disputes');
+        }
+      } catch (err) {
+        setError(err.response?.data?.message || 'Error fetching disputes');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    useEffect(() => {
+      fetchDisputes();
+    }, [account]);
+
+    return {
+      data: disputes,
+      isLoading,
+      error,
+      refetch: fetchDisputes
+    };
+  };
+
+  const useDisputeDetails = (contractId) => {
+    return useQuery({
+      queryKey: ['adminDisputeDetails', contractId],
+      queryFn: async () => {
+        const response = await axios.get(`${API_BASE_URL}/admin/disputes/${contractId}`, getRequestConfig());
+        return response.data.dispute;
+      },
+      enabled: !!account && !!contractId
+    });
+  };
+
+  const useResolveDispute = () => {
+    return useMutation({
+      mutationFn: async ({ contractId, clientShare, freelancerShare, adminNote }) => {
+        const response = await axios.post(
+          `${API_BASE_URL}/admin/disputes/${contractId}/resolve`,
+          { clientShare, freelancerShare, adminNote },
+          getRequestConfig('post')
+        );
+        return response.data;
+      },
+      onSuccess: () => {
+        toast.success('Dispute resolved successfully');
+      },
+      onError: (error) => {
+        toast.error(error.response?.data?.message || 'Failed to resolve dispute');
       }
     });
   };
 
-  // Notifications
   const useSendNotification = () => {
     return useMutation({
       mutationFn: async (notificationData) => {
-        const response = await axios({
-          url: `${API_BASE_URL}/notifications`,
-          ...getRequestConfig('post', notificationData)
-        });
+        const response = await axios(
+          'http://localhost:5000/api/admin/notifications',
+          getRequestConfig('post', notificationData)
+        );
         return response.data;
       },
       onSuccess: () => {
@@ -162,19 +211,13 @@ export const useAdminApi = () => {
     });
   };
 
-  // Data Export
   const useExportData = () => {
     return useMutation({
-      mutationFn: async ({ type, startDate, endDate }) => {
-        const response = await axios({
-          url: `${API_BASE_URL}/export/${type}`,
-          ...getRequestConfig('get'),
-          params: {
-            startDate,
-            endDate
-          },
-          responseType: 'blob'
-        });
+      mutationFn: async (type) => {
+        const response = await axios(
+          `http://localhost:5000/api/admin/export/${type}`,
+          getRequestConfig()
+        );
         return response.data;
       },
       onSuccess: (data, variables) => {
@@ -199,6 +242,9 @@ export const useAdminApi = () => {
     useUpdateUserStatus,
     useJobs,
     useContracts,
+    useDisputes,
+    useDisputeDetails,
+    useResolveDispute,
     useSendNotification,
     useExportData
   };

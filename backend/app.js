@@ -9,6 +9,7 @@ const { initializeSocket } = require('./socket');
 const bidRoutes = require('./routes/bidRoutes');
 const contractRoutes = require('./routes/contractRoutes');
 const workRoutes = require('./routes/workRoutes');
+const ipfsRoutes = require('./routes/ipfsRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const fs = require('fs');
 
@@ -27,7 +28,7 @@ if (!fs.existsSync(bidsDir)) {
 }
 
 // Initialize Web3 with Ganache
-const ganacheUrl = process.env.GANACHE_URL || 'http://127.0.0.1:8545';
+const ganacheUrl = process.env.GANACHE_URL || 'http://127.0.0.1:7545';
 const web3 = new Web3(new Web3.providers.HttpProvider(ganacheUrl));
 
 // Middleware
@@ -37,7 +38,7 @@ app.use(cors({
     origin: process.env.FRONTEND_URL || 'http://localhost:5173',
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'x-admin-wallet'],
     exposedHeaders: ['Content-Range', 'X-Content-Range']
    
 }));
@@ -117,6 +118,7 @@ app.use('/bids', bidRoutes);
 app.use('/contracts', contractRoutes);
 app.use('/work', workRoutes);
 app.use('/saved-jobs', require('./routes/savedJobs'));
+app.use('/api/ipfs', ipfsRoutes);
 app.use('/notifications', notificationRoutes);
 
 // Admin routes - Mount at /api/admin
