@@ -2,11 +2,8 @@ const { ethers } = require('ethers');
 const User = require('../models/User');
 const jwt = require('jsonwebtoken');
 
-// Array of admin wallet addresses
-const ADMIN_WALLET_ADDRESSES = [
-  '0x3Ff804112919805fFB8968ad81dBb23b32e8F3f1',
-  '0x1a16d8976a56F7EFcF2C8f861C055badA335fBdc'
-];
+// Trusted resolver wallet address that can resolve disputes
+const TRUSTED_RESOLVER_ADDRESS = '0x5F1e0C26c5c8866f25308d4240409155A9d20686';
 
 const validateAdminWallet = async (req, res, next) => {
   try {
@@ -68,30 +65,6 @@ const validateAdminWallet = async (req, res, next) => {
       });
     }
 
-    // Validate wallet address from x-admin-wallet header
-    const walletAddress = req.header('x-admin-wallet');
-    console.log('Wallet address from header:', walletAddress);
-
-    if (!walletAddress) {
-      return res.status(401).json({
-        success: false,
-        message: 'Admin wallet address is required'
-      });
-    }
-
-    // Normalize addresses for comparison
-    const normalizedUserAddress = walletAddress.toLowerCase();
-    const isAdminWallet = ADMIN_WALLET_ADDRESSES.some(
-      adminAddress => adminAddress.toLowerCase() === normalizedUserAddress
-    );
-
-    if (!isAdminWallet) {
-      return res.status(403).json({
-        success: false,
-        message: 'Access denied: Invalid admin wallet address'
-      });
-    }
-
     // Add admin user to request
     req.adminUser = user;
     req.isAdmin = true;
@@ -108,5 +81,5 @@ const validateAdminWallet = async (req, res, next) => {
 
 module.exports = {
   validateAdminWallet,
-  ADMIN_WALLET_ADDRESSES
+  TRUSTED_RESOLVER_ADDRESS
 }; 

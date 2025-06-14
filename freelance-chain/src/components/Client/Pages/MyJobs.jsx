@@ -51,19 +51,24 @@ const MyJobs = () => {
 
   const handleAcceptBid = async (bid) => {
     try {
-      if (!isConnected) {
+      setAcceptingBid(true);
+
+      // First ensure wallet is connected
+      if (!isConnected || !account) {
         await connectWallet();
+        // Wait a moment for the state to update
+        await new Promise(resolve => setTimeout(resolve, 1000));
       }
-      if (!provider || !signer) {
-        throw new Error("Connect wallet first");
+
+      // Double check connection after potential reconnect
+      if (!isConnected || !account || !provider || !signer) {
+        throw new Error("Please connect your wallet first");
       }
 
       const currentAddress = await signer.getAddress();
       if (currentAddress.toLowerCase() === bid.freelancerAddress?.toLowerCase()) {
         throw new Error("Cannot accept your own bid");
       }
-
-      setAcceptingBid(true);
 
       // Prepare contract data
       const contractData = {
@@ -78,20 +83,11 @@ const MyJobs = () => {
 
       console.log('Creating contract with params:', contractData);
 
-      console.log('Parameters passed to createContractOnChain:', {
-        freelancerAddress: contractData.freelancerAddress,
-        bidAmount: contractData.bidAmount,
-        deadline: contractData.deadline,
-        jobTitle: contractData.jobTitle,
-        jobDescription: contractData.jobDescription
-      });
-
       // Create on blockchain
       const blockchainResult = await createContractOnChain(contractData);
-
       console.log('Blockchain contract created:', blockchainResult);
 
-      // Save to backend - using the contractService function
+      // Save to backend
       const backendContract = await contractService.createContract(
         bid.jobId,
         bid._id,

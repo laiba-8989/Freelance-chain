@@ -15,14 +15,17 @@ export const useNotifications = () => {
 };
 
 export const NotificationProvider = ({ children }) => {
-  const { currentUser } = useAuth();
+  const { currentUser, isLoading: authLoading } = useAuth();
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
 
   // Fetch notifications
   const fetchNotifications = async () => {
-    if (!currentUser) return;
+    if (!currentUser) {
+      setIsLoading(false);
+      return;
+    }
     
     try {
       setIsLoading(true);
@@ -57,6 +60,8 @@ export const NotificationProvider = ({ children }) => {
 
   // Mark notification as read
   const markAsRead = async (notificationId) => {
+    if (!currentUser) return;
+
     try {
       console.log(`Attempting to mark notification as read: ${notificationId}`);
       
@@ -84,6 +89,8 @@ export const NotificationProvider = ({ children }) => {
 
   // Mark all notifications as read
   const markAllAsRead = async () => {
+    if (!currentUser) return;
+
     try {
       await api.patch('/notifications/read-all');
       setNotifications(prev =>
@@ -126,17 +133,21 @@ export const NotificationProvider = ({ children }) => {
     };
   }, [currentUser]);
 
-  // Initial fetch
+  // Initial fetch and refetch when auth state changes
   useEffect(() => {
-    if (currentUser) {
-      fetchNotifications();
+    if (!authLoading) {
+      if (currentUser) {
+        fetchNotifications();
+      } else {
+        setIsLoading(false);
+      }
     }
-  }, [currentUser]);
+  }, [currentUser, authLoading]);
 
   const value = {
     notifications,
     unreadCount,
-    isLoading,
+    isLoading: isLoading || authLoading,
     markAsRead,
     markAllAsRead,
     refreshNotifications: fetchNotifications

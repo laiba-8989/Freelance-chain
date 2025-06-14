@@ -52,10 +52,18 @@ const queryClient = new QueryClient();
 
 // Protected Route component
 const ProtectedRoute = ({ children }) => {
-  const { currentUser } = useContext(AuthContext);
-  if (!currentUser) {
+  const { currentUser, isLoading } = useContext(AuthContext);
+  
+  if (isLoading) {
+    return <div className="flex items-center justify-center h-screen">
+      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+    </div>;
+  }
+
+  if (!currentUser && !isLoading) {
     return <Navigate to="/signin" />;
   }
+
   return children;
 };
 

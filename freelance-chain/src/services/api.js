@@ -16,15 +16,22 @@ export const api = axios.create({
 // Add token to requests if it exists
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('authToken');
+  
+  // Log the request details
+  console.log('Making request to:', {
+    url: `${config.baseURL}${config.url}`,
+    method: config.method,
+    hasToken: !!token,
+    isAdminRoute: config.url?.startsWith('/api/admin')
+  });
+
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
   
-  // Log the full URL being requested
-  console.log('Making request to:', `${config.baseURL}${config.url}`);
-  
   return config;
 }, (error) => {
+  console.error('Request interceptor error:', error);
   return Promise.reject(error);
 });
 
@@ -32,29 +39,39 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
-      // Clear auth data
-      localStorage.removeItem('authToken');
-      localStorage.removeItem('user');
-      localStorage.removeItem('userId');
-      localStorage.removeItem('isAdmin');
-      
-      // Only redirect if not on a public route
-      const currentPath = window.location.pathname;
-      if (!publicPaths.some(path => currentPath.startsWith(path))) {
-        window.location.href = '/signin';
-      }
-    }
-    
-    // Log the error for debugging
+    // Log the error details
     console.error('API Error:', {
       status: error.response?.status,
       data: error.response?.data,
       message: error.message,
       url: error.config?.url,
       baseURL: error.config?.baseURL,
-      fullURL: `${error.config?.baseURL}${error.config?.url}`
+      fullURL: `${error.config?.baseURL}${error.config?.url}`,
+      headers: error.config?.headers
     });
+
+    // Handle 401 Unauthorized errors
+    if (error.response?.status === 401) {
+      const currentPath = window.location.pathname;
+      const isPublicPath = publicPaths.some(path => currentPath.startsWith(path));
+      
+      // Only clear auth data and redirect if not on a public path
+      if (!isPublicPath) {
+        console.log('Unauthorized access on protected route, clearing auth data');
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('user');
+        localStorage.removeItem('userId');
+        localStorage.removeItem('isAdmin');
+        window.location.href = '/signin';
+      }
+    }
+    
+    // Handle 403 Forbidden errors for admin routes
+    if (error.response?.status === 403 && error.config?.url?.startsWith('/api/admin')) {
+      console.log('Admin access denied:', error.response?.data);
+      // Don't redirect, just let the component handle the error
+      return Promise.reject(error);
+    }
     
     return Promise.reject(error);
   }

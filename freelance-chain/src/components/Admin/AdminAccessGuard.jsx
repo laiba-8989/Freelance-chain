@@ -44,7 +44,7 @@ const AdminAccessGuard = ({ children }) => {
         throw new Error('No authentication token found');
       }
 
-      const response = await axios.get('http://localhost:5000/api/admin/verify', {
+      const response = await axios.get(`${import.meta.env.VITE_API_URL}/api/admin/verify`, {
         headers: {
           'Authorization': `Bearer ${token}`
         },

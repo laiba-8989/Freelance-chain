@@ -536,6 +536,48 @@ const rejectWork = async (contractId, rejectionReason, signer) => {
     }
 };
 
+const resolveDispute = async (contractId, clientShare, freelancerShare, signer) => {
+    try {
+        // Get signer from centralized utility
+        const signerInstance = getSigner();
+        const provider = getProvider();
+
+        const contractWithSigner = new ethers.Contract(JobContractAddress, CONTRACT_ABI, signerInstance);
+
+        const id = typeof contractId === 'string' ? parseInt(contractId) : contractId;
+        if (isNaN(id)) throw new Error('Invalid contractId');
+
+        // Convert shares to basis points (1% = 100 basis points)
+        const clientShareBasisPoints = Math.floor(clientShare * 100);
+        const freelancerShareBasisPoints = Math.floor(freelancerShare * 100);
+
+        console.log('Resolving dispute for contract ID:', id, 'with shares:', {
+            client: clientShareBasisPoints,
+            freelancer: freelancerShareBasisPoints
+        });
+
+        // Call the smart contract's resolveDispute function
+        const tx = await contractWithSigner.resolveDispute(
+            id,
+            clientShareBasisPoints,
+            freelancerShareBasisPoints
+        );
+
+        console.log('Waiting for transaction confirmation...');
+        const receipt = await provider.waitForTransaction(tx.hash);
+
+        if (receipt.status === 1) {
+            console.log('Dispute resolved successfully:', receipt.transactionHash);
+            return true;
+        } else {
+            throw new Error('Transaction failed');
+        }
+    } catch (error) {
+        console.error('Error resolving dispute:', error);
+        throw error;
+    }
+};
+
 // *** ACTION REQUIRED: Add similar updates for resolveDispute and requestRefund if they exist ***
 // Also review the parameters for clientSignAndDeposit and raiseDispute to ensure they receive necessary amounts.
 
@@ -549,6 +591,7 @@ module.exports = {
     submitWork,
     approveWork,
     raiseDispute,
-    rejectWork
+    rejectWork,
+    resolveDispute
     // *** ACTION REQUIRED: Add resolveDispute and requestRefund to exports if implemented ***
 };

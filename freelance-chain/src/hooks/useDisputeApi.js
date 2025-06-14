@@ -1,17 +1,16 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import axios from 'axios';
-import { useWeb3 } from '../context/Web3Context';
 import { toast } from 'sonner';
 
 const API_BASE_URL = 'http://localhost:5000/api';
 
-const getRequestConfig = (account, method = 'get', data = null) => {
+const getRequestConfig = (method = 'get', data = null) => {
   const config = {
     method,
     headers: {
       'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
-      'x-admin-wallet': account
+      'Content-Type': 'application/json'
     }
   };
 
@@ -23,24 +22,16 @@ const getRequestConfig = (account, method = 'get', data = null) => {
 };
 
 export const useDisputes = () => {
-  const { account } = useWeb3();
   const [disputes, setDisputes] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
 
   const fetchDisputes = async () => {
-    if (!account) return;
-    
     setIsLoading(true);
     setError(null);
     
     try {
-      const response = await axios.get(`${API_BASE_URL}/admin/disputes`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
-          'x-admin-wallet': account
-        }
-      });
+      const response = await axios.get(`${API_BASE_URL}/admin/disputes`, getRequestConfig());
 
       if (response.data.success) {
         setDisputes(response.data.data.disputes);
@@ -56,7 +47,7 @@ export const useDisputes = () => {
 
   useEffect(() => {
     fetchDisputes();
-  }, [account]);
+  }, []);
 
   return {
     data: disputes,
@@ -67,38 +58,71 @@ export const useDisputes = () => {
 };
 
 export const useDisputeDetails = (contractId) => {
-  const { account } = useWeb3();
-  
   return useQuery({
     queryKey: ['adminDisputeDetails', contractId],
     queryFn: async () => {
       const response = await axios.get(
         `${API_BASE_URL}/admin/disputes/${contractId}`,
-        getRequestConfig(account)
+        getRequestConfig()
       );
-      return response.data.dispute;
+      return response.data.data;
     },
-    enabled: !!account && !!contractId
+    enabled: !!contractId
   });
 };
 
 export const useResolveDispute = () => {
-  const { account } = useWeb3();
-  
   return useMutation({
     mutationFn: async ({ contractId, clientShare, freelancerShare, adminNote }) => {
-      const response = await axios.post(
-        `${API_BASE_URL}/admin/disputes/${contractId}/resolve`,
-        { clientShare, freelancerShare, adminNote },
-        getRequestConfig(account, 'post')
-      );
-      return response.data;
+      try {
+        // Get the contract details to get the blockchain contractId
+        const contractResponse = await axios.get(
+          `${import.meta.env.VITE_API_URL}/admin/contracts/${contractId}`,
+          getRequestConfig()
+        );
+
+        if (!contractResponse.data.success) {
+          throw new Error(contractResponse.data.message || 'Failed to fetch contract details');
+        }
+
+        const blockchainContractId = contractResponse.data.contract.contractId;
+        if (!blockchainContractId) {
+          throw new Error('Blockchain contract ID not found');
+        }
+
+        // Calculate actual amounts based on escrow balance
+        const escrowBalance = contractResponse.data.contract.escrowBalance;
+        const clientAmount = (escrowBalance * clientShare) / 100;
+        const freelancerAmount = (escrowBalance * freelancerShare) / 100;
+
+        // Resolve the dispute using the blockchain contractId
+        const response = await axios.post(
+          `${import.meta.env.VITE_API_URL}/admin/disputes/${contractId}/resolve`,
+          { 
+            blockchainContractId,
+            clientShare: clientAmount, 
+            freelancerShare: freelancerAmount, 
+            adminNote 
+          },
+          getRequestConfig('post')
+        );
+
+        if (!response.data.success) {
+          throw new Error(response.data.message || 'Failed to resolve dispute');
+        }
+
+        return response.data;
+      } catch (error) {
+        console.error('Resolve dispute error:', error);
+        throw new Error(error.response?.data?.message || error.message || 'Failed to resolve dispute');
+      }
     },
     onSuccess: () => {
       toast.success('Dispute resolved successfully');
     },
     onError: (error) => {
-      toast.error(error.response?.data?.message || 'Failed to resolve dispute');
+      console.error('Resolve dispute error:', error);
+      toast.error(error.message || 'Failed to resolve dispute');
     }
   });
 }; 

@@ -33,31 +33,68 @@ const Disputes = () => {
 
   // Resolve dispute mutation
   const { 
-    resolveDispute,
+    mutate: resolveDispute,
     isLoading: isResolving
   } = useResolveDispute();
 
   const handleResolveDispute = async (e) => {
     e.preventDefault();
-    if (!selectedDispute) return;
+    const disputeToResolve = contractId ? disputeDetails : selectedDispute;
+    if (!disputeToResolve) {
+      toast.error('No dispute selected');
+      return;
+    }
+
+    // Validate shares
+    const clientShare = parseFloat(resolutionForm.clientShare);
+    const freelancerShare = parseFloat(resolutionForm.freelancerShare);
+    
+    if (isNaN(clientShare) || isNaN(freelancerShare)) {
+      toast.error('Invalid share values');
+      return;
+    }
+
+    if (clientShare + freelancerShare !== 100) {
+      toast.error('Shares must total 100%');
+      return;
+    }
 
     try {
-      await resolveDispute({
-        contractId: selectedDispute._id,
-        ...resolutionForm
+      resolveDispute({
+        contractId: disputeToResolve._id,
+        clientShare,
+        freelancerShare,
+        adminNote: resolutionForm.adminNote
+      }, {
+        onSuccess: () => {
+          toast.success('Dispute resolved successfully');
+          setSelectedDispute(null);
+          setResolutionForm({
+            clientShare: '',
+            freelancerShare: '',
+            adminNote: ''
+          });
+          refetchDisputes();
+          if (contractId) {
+            navigate('/admin/disputes');
+          }
+        },
+        onError: (error) => {
+          toast.error(error.message || 'Failed to resolve dispute');
+        }
       });
-      
-      toast.success('Dispute resolved successfully');
-      setSelectedDispute(null);
-      setResolutionForm({
-        clientShare: '',
-        freelancerShare: '',
-        adminNote: ''
-      });
-      refetchDisputes();
     } catch (error) {
       toast.error(error.message || 'Failed to resolve dispute');
     }
+  };
+
+  const handleSelectDispute = (dispute) => {
+    setSelectedDispute(dispute);
+    setResolutionForm({
+      clientShare: '',
+      freelancerShare: '',
+      adminNote: ''
+    });
   };
 
   if (isLoadingList || isLoadingDetails) {
@@ -201,7 +238,7 @@ const Disputes = () => {
               
               <div className="mt-4 flex justify-end">
                 <button
-                  onClick={() => navigate(`/admin/disputes/${dispute._id}`)}
+                  onClick={() => handleSelectDispute(dispute)}
                   className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
                 >
                   View Details
@@ -213,6 +250,70 @@ const Disputes = () => {
       ) : (
         <div className="text-center py-12">
           <p className="text-gray-500 text-lg">No active disputes found</p>
+        </div>
+      )}
+
+      {/* Resolution Modal */}
+      {selectedDispute && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full">
+            <h3 className="text-xl font-bold mb-4">Resolve Dispute</h3>
+            <form onSubmit={handleResolveDispute} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Client Share (%)</label>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={resolutionForm.clientShare}
+                  onChange={(e) => setResolutionForm(prev => ({ ...prev, clientShare: e.target.value }))}
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Freelancer Share (%)</label>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={resolutionForm.freelancerShare}
+                  onChange={(e) => setResolutionForm(prev => ({ ...prev, freelancerShare: e.target.value }))}
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Admin Note</label>
+                <textarea
+                  value={resolutionForm.adminNote}
+                  onChange={(e) => setResolutionForm(prev => ({ ...prev, adminNote: e.target.value }))}
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  rows="4"
+                  required
+                />
+              </div>
+
+              <div className="flex justify-end space-x-4">
+                <button
+                  type="button"
+                  onClick={() => setSelectedDispute(null)}
+                  className="px-4 py-2 text-gray-600 hover:text-gray-800"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isResolving}
+                  className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 disabled:opacity-50"
+                >
+                  {isResolving ? 'Resolving...' : 'Resolve'}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </div>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import { useWeb3 } from '../../context/Web3Context';
 import { 
@@ -16,8 +16,32 @@ import {
 
 const AdminLayout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [adminName, setAdminName] = useState('');
   const { account, disconnectWallet } = useWeb3();
   const location = useLocation();
+
+  useEffect(() => {
+    const fetchAdminInfo = async () => {
+      if (account) {
+        try {
+          const response = await fetch(`${import.meta.env.VITE_API_URL}/admin/verify?walletAddress=${account}`, {
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+              'x-admin-wallet': account
+            }
+          });
+          const data = await response.json();
+          if (data.success && data.user) {
+            setAdminName(data.user.name || 'Admin');
+          }
+        } catch (error) {
+          console.error('Error fetching admin info:', error);
+        }
+      }
+    };
+
+    fetchAdminInfo();
+  }, [account]);
 
   const navigation = [
     { name: 'Dashboard', href: '/admin/dashboard', icon: HomeIcon },
@@ -64,7 +88,10 @@ const AdminLayout = () => {
               <UserCircleIcon className="w-8 h-8 text-gray-400" />
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-gray-900 truncate">
-                  {account ? `${account.slice(0, 6)}...${account.slice(-4)}` : 'Not Connected'}
+                  {adminName || (account ? `${account.slice(0, 6)}...${account.slice(-4)}` : 'Not Connected')}
+                </p>
+                <p className="text-xs text-gray-500 truncate">
+                  {account ? `${account.slice(0, 6)}...${account.slice(-4)}` : ''}
                 </p>
                 <button
                   onClick={disconnectWallet}
@@ -95,6 +122,12 @@ const AdminLayout = () => {
               {navigation.find(item => isActive(item.href))?.name || 'Admin Panel'}
             </h2>
           </div>
+          {adminName && (
+            <div className="flex items-center space-x-2">
+              <span className="text-sm text-gray-600">Welcome,</span>
+              <span className="text-sm font-medium text-gray-900">{adminName}</span>
+            </div>
+          )}
         </div>
 
         {/* Page Content */}
