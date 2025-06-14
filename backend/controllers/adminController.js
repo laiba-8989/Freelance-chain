@@ -10,8 +10,10 @@ const Report = require('../models/Report');
 const path = require('path');
 const notificationService = require('../services/notificationService');
 const Notification = require('../models/Notification');
-const { resolveDispute } = require('../utils/contractUtils');
+const { resolveDispute: resolveDisputeOnChain } = require('../utils/contractUtils');
+const { getSigner } = require('../utils/web3Utils');
 const express = require('express');
+const ethers = require('ethers');
 
 const adminController = {
   // Dashboard stats
@@ -175,10 +177,11 @@ const adminController = {
 // Contract management
   getContracts: async (req, res) => {
     try {
-      const { page = 1, limit = 10, status } = req.query;
+      const { page = 1, limit = 10, status, blockchainContractId } = req.query;
       const query = {};
 
       if (status) query.status = status;
+      if (blockchainContractId) query.contractId = blockchainContractId;
 
       const contracts = await Contract.find(query)
         .populate('client', 'name walletAddress')
@@ -350,19 +353,48 @@ const adminController = {
 
   resolveDispute: async (req, res) => {
     try {
-      const { blockchainContractId, clientShare, freelancerShare, adminNote } = req.body;
       const { contractId } = req.params;
+      const { clientShare, freelancerShare, adminNote } = req.body;
+      const adminWallet = req.header('x-admin-wallet');
 
-      // Validate required parameters
-      if (!blockchainContractId || !clientShare || !freelancerShare || !adminNote) {
-        return res.status(400).json({
+      if (!adminWallet) {
+        return res.status(403).json({
           success: false,
-          message: 'Missing required parameters'
+          message: 'Admin wallet address required'
         });
       }
 
-      // Get contract
-      const contract = await Contract.findById(contractId);
+      // Validate required parameters
+      if (!clientShare || !freelancerShare) {
+        return res.status(400).json({
+          success: false,
+          message: 'Client and freelancer shares are required'
+        });
+      }
+
+      // Parse shares as numbers
+      const clientShareNum = parseFloat(clientShare);
+      const freelancerShareNum = parseFloat(freelancerShare);
+
+      // Validate shares
+      if (isNaN(clientShareNum) || isNaN(freelancerShareNum)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid share values'
+        });
+      }
+
+      if (clientShareNum + freelancerShareNum !== 100) {
+        return res.status(400).json({
+          success: false,
+          message: 'Shares must total 100%'
+        });
+      }
+
+      // Get contract from database
+      const contract = await Contract.findById(contractId)
+        .populate('client freelancer job');
+
       if (!contract) {
         return res.status(404).json({
           success: false,
@@ -370,75 +402,87 @@ const adminController = {
         });
       }
 
-      // Check if contract is in dispute
-      if (contract.status !== 'disputed') {
+      // Verify contract is in dispute
+      if (contract.status !== 'Disputed') {
         return res.status(400).json({
           success: false,
           message: 'Contract is not in dispute'
         });
       }
 
-      // Resolve dispute using smart contract
-      const result = await resolveDispute(blockchainContractId, clientShare, freelancerShare);
-      if (!result.success) {
-        return res.status(500).json({
+      // Get escrow balance from smart contract
+      const escrowBalance = await contractUtils.getEscrowBalance(contract.blockchainContractId);
+      if (!escrowBalance) {
+        return res.status(400).json({
           success: false,
-          message: result.message || 'Failed to resolve dispute on blockchain'
+          message: 'No escrow balance found'
         });
       }
 
-      // Update contract status
-      contract.status = 'completed';
+      // Calculate wei amounts
+      const clientAmountWei = escrowBalance.mul(clientShareNum).div(100);
+      const freelancerAmountWei = escrowBalance.mul(freelancerShareNum).div(100);
+
+      // Verify total equals escrow balance
+      const totalWei = clientAmountWei.add(freelancerAmountWei);
+      if (!totalWei.eq(escrowBalance)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Calculated amounts do not equal escrow balance'
+        });
+      }
+
+      // Resolve dispute on blockchain
+      const tx = await contractUtils.resolveDispute(
+        contract.blockchainContractId,
+        clientAmountWei.toString(),
+        freelancerAmountWei.toString()
+      );
+
+      // Update contract in database
+      contract.status = 'Resolved';
       contract.disputeResolution = {
-        clientShare,
-        freelancerShare,
-        adminNote,
         resolvedAt: new Date(),
-        transactionHash: result.transactionHash,
-        resolvedBy: req.adminUser._id // Store which admin resolved the dispute
+        clientShare: clientShareNum,
+        freelancerShare: freelancerShareNum,
+        adminNote: adminNote || '',
+        transactionHash: tx.hash,
+        resolvedBy: adminWallet
       };
       await contract.save();
 
       // Send notifications
-      await Notification.create({
-        userId: contract.clientId,
-        type: 'dispute_resolved',
+      await notificationService.sendNotification({
+        userId: contract.client._id,
+        type: 'DISPUTE_RESOLVED',
         title: 'Dispute Resolved',
-        message: `Your dispute for contract "${contract.title}" has been resolved. You will receive ${clientShare}% of the funds.`,
-        metadata: {
+        message: `Your dispute for contract #${contract._id} has been resolved. You will receive ${clientShareNum}% of the escrow amount.`,
+        data: {
           contractId: contract._id,
-          clientShare,
-          freelancerShare,
-          adminNote,
-          resolvedBy: req.adminUser.name
+          resolution: contract.disputeResolution
         }
       });
 
-      await Notification.create({
-        userId: contract.freelancerId,
-        type: 'dispute_resolved',
+      await notificationService.sendNotification({
+        userId: contract.freelancer._id,
+        type: 'DISPUTE_RESOLVED',
         title: 'Dispute Resolved',
-        message: `Your dispute for contract "${contract.title}" has been resolved. You will receive ${freelancerShare}% of the funds.`,
-        metadata: {
+        message: `Your dispute for contract #${contract._id} has been resolved. You will receive ${freelancerShareNum}% of the escrow amount.`,
+        data: {
           contractId: contract._id,
-          clientShare,
-          freelancerShare,
-          adminNote,
-          resolvedBy: req.adminUser.name
+          resolution: contract.disputeResolution
         }
       });
 
-      return res.json({
+      res.json({
         success: true,
         message: 'Dispute resolved successfully',
-        data: {
-          contract,
-          transactionHash: result.transactionHash
-        }
+        contract
       });
+
     } catch (error) {
       console.error('Resolve dispute error:', error);
-      return res.status(500).json({
+      res.status(500).json({
         success: false,
         message: error.message || 'Failed to resolve dispute'
       });

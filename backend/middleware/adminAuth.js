@@ -1,23 +1,30 @@
 const { ethers } = require('ethers');
 const User = require('../models/User');
 const jwt = require('jsonwebtoken');
-
+ 
 // Trusted resolver wallet address that can resolve disputes
 const TRUSTED_RESOLVER_ADDRESS = '0x5F1e0C26c5c8866f25308d4240409155A9d20686';
-
+ 
+// List of admin wallet addresses
+const ADMIN_WALLET_ADDRESSES = [
+    TRUSTED_RESOLVER_ADDRESS,
+    '0x126eecbce83e22da5f46dc2be670994db2cd2a8d' ,
+    '0x3Ff804112919805fFB8968ad81dBb23b32e8F3f1' // Added user's wallet address
+];
+ 
 const validateAdminWallet = async (req, res, next) => {
   try {
     // First validate the JWT token
     const authHeader = req.header('Authorization');
     console.log('Auth header:', authHeader);
-
+ 
     if (!authHeader) {
       return res.status(401).json({
         success: false,
         message: 'No authentication token provided'
       });
     }
-
+ 
     const token = authHeader.replace('Bearer ', '');
     if (!token) {
       return res.status(401).json({
@@ -25,9 +32,9 @@ const validateAdminWallet = async (req, res, next) => {
         message: 'Invalid token format'
       });
     }
-
+ 
     console.log('Token to verify:', token);
-
+ 
     // Verify token
     let decoded;
     try {
@@ -40,14 +47,14 @@ const validateAdminWallet = async (req, res, next) => {
         message: 'Invalid authentication token'
       });
     }
-
+ 
     if (!decoded || !decoded.userId) {
       return res.status(401).json({
         success: false,
         message: 'Invalid token payload'
       });
     }
-
+ 
     // Find user by ID from token
     const user = await User.findById(decoded.userId);
     if (!user) {
@@ -56,7 +63,7 @@ const validateAdminWallet = async (req, res, next) => {
         message: 'User not found'
       });
     }
-
+ 
     // Check if user is admin
     if (user.role !== 'admin') {
       return res.status(403).json({
@@ -64,7 +71,7 @@ const validateAdminWallet = async (req, res, next) => {
         message: 'Access denied: User is not an admin'
       });
     }
-
+ 
     // Add admin user to request
     req.adminUser = user;
     req.isAdmin = true;
@@ -78,8 +85,9 @@ const validateAdminWallet = async (req, res, next) => {
     });
   }
 };
-
+ 
 module.exports = {
   validateAdminWallet,
-  TRUSTED_RESOLVER_ADDRESS
-}; 
+  TRUSTED_RESOLVER_ADDRESS,
+  ADMIN_WALLET_ADDRESSES
+};

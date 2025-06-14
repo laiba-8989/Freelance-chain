@@ -1,24 +1,24 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useWeb3 } from '../../context/Web3Context';
-import axios from 'axios';
+import { api } from '../../services/api';
 import { toast } from 'react-hot-toast';
-
+ 
 const AdminAccessGuard = ({ children }) => {
   const navigate = useNavigate();
   const { account, connectWallet, isConnected } = useWeb3();
   const [isVerifying, setIsVerifying] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
-
+ 
   useEffect(() => {
     checkAdminAccess();
   }, [account]);
-
-    const checkExistingVerification = () => {
+ 
+  const checkExistingVerification = () => {
     const verifiedAdmin = localStorage.getItem('verifiedAdmin');
     const verifiedWallet = localStorage.getItem('verifiedWallet');
     const authToken = localStorage.getItem('authToken');
-    
+   
     if (verifiedAdmin && verifiedWallet === account && authToken) {
       setIsAdmin(true);
       setIsVerifying(false);
@@ -26,7 +26,7 @@ const AdminAccessGuard = ({ children }) => {
     }
     return false;
   };
-
+ 
   const handleWalletConnection = async () => {
     try {
       await connectWallet();
@@ -36,23 +36,20 @@ const AdminAccessGuard = ({ children }) => {
       navigate('/');
     }
   };
-
+ 
   const verifyAdminStatus = async (walletAddress) => {
     try {
       const token = localStorage.getItem('authToken');
       if (!token) {
         throw new Error('No authentication token found');
       }
-
-      const response = await axios.get(`${import.meta.env.VITE_API_URL}/api/admin/verify`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        },
+ 
+      const response = await api.get('/api/admin/verify', {
         params: {
           walletAddress
         }
       });
-
+ 
       if (response.data.success && response.data.isAdmin) {
         localStorage.setItem('verifiedAdmin', 'true');
         localStorage.setItem('verifiedWallet', walletAddress);
@@ -71,38 +68,38 @@ const AdminAccessGuard = ({ children }) => {
       return false;
     }
   };
-
+ 
   const handleNavigation = (path) => {
     navigate(path);
   };
-
+ 
   const checkAdminAccess = async () => {
     setIsVerifying(true);
-
+ 
     // First check if we have stored verification
     if (checkExistingVerification()) {
       setIsVerifying(false);
         return;
       }
-
+ 
     // If no wallet is connected, prompt connection
     if (!isConnected) {
             await handleWalletConnection();
           return;
         }
-
+ 
     // Verify admin status
     const isVerified = await verifyAdminStatus(account);
-    
+   
     if (!isVerified) {
       toast.error('Access denied: Admin privileges required');
       navigate('/');
         return;
       }
-
+ 
     setIsVerifying(false);
   };
-
+ 
   if (isVerifying) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-100">
@@ -113,12 +110,12 @@ const AdminAccessGuard = ({ children }) => {
       </div>
     );
   }
-
+ 
   if (!isAdmin) {
     return null;
   }
-
+ 
   return children;
 };
-
-export default AdminAccessGuard; 
+ 
+export default AdminAccessGuard;

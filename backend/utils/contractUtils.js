@@ -536,9 +536,9 @@ const rejectWork = async (contractId, rejectionReason, signer) => {
     }
 };
 
-const resolveDispute = async (contractId, clientShare, freelancerShare, signer) => {
+const resolveDispute = async (contractId, clientShare, freelancerShare) => {
     try {
-        // Get signer from centralized utility
+        // Get signer and provider from centralized utilities
         const signerInstance = getSigner();
         const provider = getProvider();
 
@@ -547,20 +547,34 @@ const resolveDispute = async (contractId, clientShare, freelancerShare, signer) 
         const id = typeof contractId === 'string' ? parseInt(contractId) : contractId;
         if (isNaN(id)) throw new Error('Invalid contractId');
 
-        // Convert shares to basis points (1% = 100 basis points)
-        const clientShareBasisPoints = Math.floor(clientShare * 100);
-        const freelancerShareBasisPoints = Math.floor(freelancerShare * 100);
+        // Ensure shares are BigNumber instances
+        const clientShareBN = ethers.BigNumber.from(clientShare);
+        const freelancerShareBN = ethers.BigNumber.from(freelancerShare);
 
         console.log('Resolving dispute for contract ID:', id, 'with shares:', {
-            client: clientShareBasisPoints,
-            freelancer: freelancerShareBasisPoints
+            client: clientShareBN.toString(),
+            freelancer: freelancerShareBN.toString()
         });
+
+        // Get current contract state to verify it's in dispute
+        const contractState = await contractWithSigner.getContract(id);
+        if (contractState.status !== 5) { // 5 is Disputed status
+            throw new Error('Contract is not in dispute status');
+        }
+
+        // Get escrow balance to verify shares
+        const escrowBalance = await contractWithSigner.getEscrowBalance(id);
+        const totalShares = clientShareBN.add(freelancerShareBN);
+        
+        if (!totalShares.eq(escrowBalance)) {
+            throw new Error(`Total shares (${totalShares.toString()}) must equal escrow balance (${escrowBalance.toString()})`);
+        }
 
         // Call the smart contract's resolveDispute function
         const tx = await contractWithSigner.resolveDispute(
             id,
-            clientShareBasisPoints,
-            freelancerShareBasisPoints
+            clientShareBN,
+            freelancerShareBN
         );
 
         console.log('Waiting for transaction confirmation...');
@@ -573,7 +587,12 @@ const resolveDispute = async (contractId, clientShare, freelancerShare, signer) 
             throw new Error('Transaction failed');
         }
     } catch (error) {
-        console.error('Error resolving dispute:', error);
+        console.error('Error resolving dispute:', {
+            error: error.message,
+            code: error.code,
+            reason: error.reason,
+            data: error.data
+        });
         throw error;
     }
 };

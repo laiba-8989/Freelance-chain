@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { validateAdminWallet } = require('../middleware/adminAuth');
+const { validateAdminWallet, ADMIN_WALLET_ADDRESSES } = require('../middleware/adminAuth');
 const adminController = require('../controllers/adminController');
 const User = require('../models/User');
 const jwt = require('jsonwebtoken');
@@ -37,9 +37,11 @@ router.get('/verify', async (req, res) => {
       });
     }
 
-    const { walletAddress } = req.query;
-    if (!walletAddress) {
-      console.log('No wallet address provided in query');
+    const walletAddress = req.query.walletAddress?.toLowerCase();
+    const headerWalletAddress = req.header('x-admin-wallet')?.toLowerCase();
+
+    if (!walletAddress || !headerWalletAddress) {
+      console.log('No wallet address provided in query or header');
       return res.status(400).json({
         success: false,
         isAdmin: false,
@@ -47,11 +49,30 @@ router.get('/verify', async (req, res) => {
       });
     }
 
-    console.log('Looking up user with wallet address:', walletAddress.toLowerCase());
+    if (walletAddress !== headerWalletAddress) {
+      console.log('Wallet address mismatch:', { query: walletAddress, header: headerWalletAddress });
+      return res.status(400).json({
+        success: false,
+        isAdmin: false,
+        message: 'Wallet address mismatch'
+      });
+    }
+
+    // Check if wallet address is in trusted admin list
+    if (!ADMIN_WALLET_ADDRESSES.map(addr => addr.toLowerCase()).includes(walletAddress)) {
+      console.log('Wallet address not in trusted admin list:', walletAddress);
+      return res.status(403).json({
+        success: false,
+        isAdmin: false,
+        message: 'Wallet address not in trusted admin list'
+      });
+    }
+
+    console.log('Looking up user with wallet address:', walletAddress);
 
     // Find user and verify admin role
     const user = await User.findOne({ 
-      walletAddress: walletAddress.toLowerCase(),
+      walletAddress: walletAddress,
       role: 'admin'
     });
 

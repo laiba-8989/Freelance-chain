@@ -1,127 +1,115 @@
-import { useState, useEffect } from 'react';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import { toast } from 'sonner';
+import { useWeb3 } from '../context/Web3Context';
 
-const API_BASE_URL = 'http://localhost:5000/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL;
 
-const getRequestConfig = (method = 'get', data = null) => {
+const getRequestConfig = (method = 'get', data = null, isFormData = false) => {
+  const token = localStorage.getItem('authToken');
+  const adminWallet = localStorage.getItem('adminWalletAddress');
+
   const config = {
     method,
     headers: {
-      'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
-      'Content-Type': 'application/json'
-    }
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': isFormData ? 'multipart/form-data' : 'application/json',
+    },
+    ...(data && { data })
   };
 
-  if (data) {
-    config.data = data;
+  // Add admin wallet header if available
+  if (adminWallet) {
+    config.headers['x-admin-wallet'] = adminWallet.toLowerCase();
   }
 
   return config;
 };
 
 export const useDisputes = () => {
-  const [disputes, setDisputes] = useState([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState(null);
+  return useQuery({
+    queryKey: ['disputes'],
+    queryFn: async () => {
+      try {
+        const response = await axios.get(
+          `${API_BASE_URL}/admin/disputes`,
+          getRequestConfig()
+        );
 
-  const fetchDisputes = async () => {
-    setIsLoading(true);
-    setError(null);
-    
-    try {
-      const response = await axios.get(`${API_BASE_URL}/admin/disputes`, getRequestConfig());
+        if (!response.data || !response.data.success) {
+          throw new Error(response.data?.message || 'Failed to fetch disputes');
+        }
 
-      if (response.data.success) {
-        setDisputes(response.data.data.disputes);
-      } else {
-        setError(response.data.message || 'Failed to fetch disputes');
+        return response.data.disputes || [];
+      } catch (error) {
+        console.error('Error fetching disputes:', error);
+        throw new Error(error.response?.data?.message || error.message || 'Failed to fetch disputes');
       }
-    } catch (err) {
-      setError(err.response?.data?.message || 'Error fetching disputes');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchDisputes();
-  }, []);
-
-  return {
-    data: disputes,
-    isLoading,
-    error,
-    refetch: fetchDisputes
-  };
+    },
+    retry: 1,
+    staleTime: 30000, // 30 seconds
+  });
 };
 
 export const useDisputeDetails = (contractId) => {
   return useQuery({
-    queryKey: ['adminDisputeDetails', contractId],
+    queryKey: ['dispute', contractId],
     queryFn: async () => {
-      const response = await axios.get(
-        `${API_BASE_URL}/admin/disputes/${contractId}`,
-        getRequestConfig()
-      );
-      return response.data.data;
+      if (!contractId) return null;
+
+      try {
+        const response = await axios.get(
+          `${API_BASE_URL}/admin/disputes/${contractId}`,
+          getRequestConfig()
+        );
+
+        if (!response.data || !response.data.success) {
+          throw new Error(response.data?.message || 'Failed to fetch dispute details');
+        }
+
+        return response.data.dispute;
+      } catch (error) {
+        console.error('Error fetching dispute details:', error);
+        throw new Error(error.response?.data?.message || error.message || 'Failed to fetch dispute details');
+      }
     },
-    enabled: !!contractId
+    enabled: !!contractId,
+    retry: 1,
+    staleTime: 30000, // 30 seconds
   });
 };
 
 export const useResolveDispute = () => {
+  const queryClient = useQueryClient();
+
   return useMutation({
     mutationFn: async ({ contractId, clientShare, freelancerShare, adminNote }) => {
       try {
-        // Get the contract details to get the blockchain contractId
-        const contractResponse = await axios.get(
-          `${import.meta.env.VITE_API_URL}/admin/contracts/${contractId}`,
-          getRequestConfig()
-        );
-
-        if (!contractResponse.data.success) {
-          throw new Error(contractResponse.data.message || 'Failed to fetch contract details');
-        }
-
-        const blockchainContractId = contractResponse.data.contract.contractId;
-        if (!blockchainContractId) {
-          throw new Error('Blockchain contract ID not found');
-        }
-
-        // Calculate actual amounts based on escrow balance
-        const escrowBalance = contractResponse.data.contract.escrowBalance;
-        const clientAmount = (escrowBalance * clientShare) / 100;
-        const freelancerAmount = (escrowBalance * freelancerShare) / 100;
-
-        // Resolve the dispute using the blockchain contractId
         const response = await axios.post(
-          `${import.meta.env.VITE_API_URL}/admin/disputes/${contractId}/resolve`,
-          { 
-            blockchainContractId,
-            clientShare: clientAmount, 
-            freelancerShare: freelancerAmount, 
-            adminNote 
+          `${API_BASE_URL}/admin/disputes/${contractId}/resolve`,
+          {
+            clientShare,
+            freelancerShare,
+            adminNote
           },
           getRequestConfig('post')
         );
 
-        if (!response.data.success) {
-          throw new Error(response.data.message || 'Failed to resolve dispute');
+        if (!response.data || !response.data.success) {
+          throw new Error(response.data?.message || 'Failed to resolve dispute');
         }
 
         return response.data;
       } catch (error) {
-        console.error('Resolve dispute error:', error);
+        console.error('Error resolving dispute:', error);
         throw new Error(error.response?.data?.message || error.message || 'Failed to resolve dispute');
       }
     },
     onSuccess: () => {
+      queryClient.invalidateQueries(['disputes']);
       toast.success('Dispute resolved successfully');
     },
     onError: (error) => {
-      console.error('Resolve dispute error:', error);
       toast.error(error.message || 'Failed to resolve dispute');
     }
   });
