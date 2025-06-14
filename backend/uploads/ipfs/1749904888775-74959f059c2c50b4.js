@@ -1,4 +1,3 @@
-
 const { ethers } = require('ethers');
 const User = require('../models/User');
 const jwt = require('jsonwebtoken');
@@ -10,8 +9,7 @@ const TRUSTED_RESOLVER_ADDRESS = '0x5F1e0C26c5c8866f25308d4240409155A9d20686';
 const ADMIN_WALLET_ADDRESSES = [
     TRUSTED_RESOLVER_ADDRESS,
     '0x126eecbce83e22da5f46dc2be670994db2cd2a8d' ,
-    '0x3Ff804112919805fFB8968ad81dBb23b32e8F3f1' ,// Added user's wallet address
-    '0x1a16d8976a56F7EFcF2C8f861C055badA335fBdc'
+    '0x3Ff804112919805fFB8968ad81dBb23b32e8F3f1' // Added user's wallet address
 ];
  
 const validateAdminWallet = async (req, res, next) => {

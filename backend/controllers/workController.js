@@ -1,6 +1,7 @@
 const WorkSubmission = require('../models/WorkSubmission');
 const Contract = require('../models/Contract');
 const contractUtils = require('../utils/contractUtils');
+const notificationService = require('../services/notificationService');
 
 exports.submitWork = async (req, res) => {
     try {
@@ -55,6 +56,9 @@ exports.submitWork = async (req, res) => {
 
         await contract.save();
         console.log('[submitWork] Database updated successfully');
+
+        // Create notification for the client
+        await notificationService.notifyWorkSubmitted(contract, workHash);
 
         res.json({ success: true, contract });
     } catch (error) {

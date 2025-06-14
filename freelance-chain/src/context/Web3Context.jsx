@@ -48,23 +48,6 @@ export const Web3Provider = ({ children }) => {
     blockExplorerUrls: ['https://explorer-vanguard.vanarchain.com']
   };
 
-  const checkSignerAuthorization = async (address) => {
-    if (!provider || !address) return false;
-    try {
-      const contract = new ethers.Contract(
-        import.meta.env.VITE_CONTRACT_ADDRESS,
-        CONTRACT_ABI,
-        provider
-      );
-      const isAuthorized = await contract.authorizedSigners(address);
-      setIsAuthorizedSigner(isAuthorized);
-      return isAuthorized;
-    } catch (error) {
-      console.error('Error checking signer authorization:', error);
-      return false;
-    }
-  };
-
   const connectWallet = async () => {
     try {
       if (!window.ethereum) {
@@ -114,9 +97,6 @@ export const Web3Provider = ({ children }) => {
       setIsConnected(true);
       setChainId(network.chainId);
       setNetwork(network);
-
-      // Check authorization only after connected and on correct network
-      checkSignerAuthorization(account);
 
       // Save wallet connection state
       localStorage.setItem('walletConnected', 'true');
@@ -202,7 +182,6 @@ export const Web3Provider = ({ children }) => {
     isAuthorizedSigner,
     connectWallet,
     disconnectWallet,
-    checkSignerAuthorization,
     VANGUARD_CHAIN_ID_NUM,
     network
   };

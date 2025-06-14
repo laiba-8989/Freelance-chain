@@ -98,10 +98,11 @@ const SignIn = () => {
 
                         const adminResponse = await api.get('/api/admin/verify', {
                             headers: {
-                                'Authorization': `Bearer ${token}`
+                                'Authorization': `Bearer ${token}`,
+                                'x-admin-wallet': walletAddress.toLowerCase()
                             },
                             params: {
-                                walletAddress: walletAddress
+                                walletAddress: walletAddress.toLowerCase()
                             }
                         });
 

@@ -536,6 +536,67 @@ const rejectWork = async (contractId, rejectionReason, signer) => {
     }
 };
 
+const resolveDispute = async (contractId, clientShare, freelancerShare) => {
+    try {
+        // Get signer and provider from centralized utilities
+        const signerInstance = getSigner();
+        const provider = getProvider();
+
+        const contractWithSigner = new ethers.Contract(JobContractAddress, CONTRACT_ABI, signerInstance);
+
+        const id = typeof contractId === 'string' ? parseInt(contractId) : contractId;
+        if (isNaN(id)) throw new Error('Invalid contractId');
+
+        // Ensure shares are BigNumber instances
+        const clientShareBN = ethers.BigNumber.from(clientShare);
+        const freelancerShareBN = ethers.BigNumber.from(freelancerShare);
+
+        console.log('Resolving dispute for contract ID:', id, 'with shares:', {
+            client: clientShareBN.toString(),
+            freelancer: freelancerShareBN.toString()
+        });
+
+        // Get current contract state to verify it's in dispute
+        const contractState = await contractWithSigner.getContract(id);
+        if (contractState.status !== 5) { // 5 is Disputed status
+            throw new Error('Contract is not in dispute status');
+        }
+
+        // Get escrow balance to verify shares
+        const escrowBalance = await contractWithSigner.getEscrowBalance(id);
+        const totalShares = clientShareBN.add(freelancerShareBN);
+        
+        if (!totalShares.eq(escrowBalance)) {
+            throw new Error(`Total shares (${totalShares.toString()}) must equal escrow balance (${escrowBalance.toString()})`);
+        }
+
+        // Call the smart contract's resolveDispute function
+        const tx = await contractWithSigner.resolveDispute(
+            id,
+            clientShareBN,
+            freelancerShareBN
+        );
+
+        console.log('Waiting for transaction confirmation...');
+        const receipt = await provider.waitForTransaction(tx.hash);
+
+        if (receipt.status === 1) {
+            console.log('Dispute resolved successfully:', receipt.transactionHash);
+            return true;
+        } else {
+            throw new Error('Transaction failed');
+        }
+    } catch (error) {
+        console.error('Error resolving dispute:', {
+            error: error.message,
+            code: error.code,
+            reason: error.reason,
+            data: error.data
+        });
+        throw error;
+    }
+};
+
 // *** ACTION REQUIRED: Add similar updates for resolveDispute and requestRefund if they exist ***
 // Also review the parameters for clientSignAndDeposit and raiseDispute to ensure they receive necessary amounts.
 
@@ -549,6 +610,7 @@ module.exports = {
     submitWork,
     approveWork,
     raiseDispute,
-    rejectWork
+    rejectWork,
+    resolveDispute
     // *** ACTION REQUIRED: Add resolveDispute and requestRefund to exports if implemented ***
 };

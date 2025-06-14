@@ -24,10 +24,6 @@
     "@web3-react/injected-connector": "^6.0.7",
     "axios": "^1.9.0",
     "date-fns": "^4.1.0",
-<<<<<<< HEAD
-    "ethers": "^5.8.0",
-=======
->>>>>>> aebd2924c00248cb59cfd2970a856720df94ff60
     "dayjs": "^1.11.13",
     "ethers": "^5.8.0",
     "formik": "^2.4.6",

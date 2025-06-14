@@ -12,6 +12,7 @@ import { downloadFromIPFS, downloadWorkSubmission } from '../../services/ipfsSer
 import Modal from '../Modal'; // Updated import path
 import { useAuth } from '../../AuthContext';
 import { contractService } from '../../services/ContractService';
+import { useAdminApi } from '../../hooks/useAdminApi'; // Add this import
 
 // Helper function to validate addresses
 const validateAddress = (address) => {
@@ -44,6 +45,8 @@ const ContractView = () => {
   const [disputeLoading, setDisputeLoading] = useState(false);
   const [showDisputeModal, setShowDisputeModal] = useState(false);
   const { user } = useAuth();
+  const { useResolveDispute } = useAdminApi(); // Destructure useResolveDispute
+  const resolveDisputeMutation = useResolveDispute(); // Initialize the mutation
   const [showResolveModal, setShowResolveModal] = useState(false);
   const [clientShare, setClientShare] = useState('');
   const [freelancerShare, setFreelancerShare] = useState('');
@@ -179,7 +182,7 @@ const ContractView = () => {
       console.log('Gas price with buffer:', ethers.utils.formatUnits(bufferedGasPrice, 'gwei'), 'gwei');
 
       // Use clientSignAndDeposit to handle both signing and depositing in one transaction
-      if (!currentContractState.clientApproved || !currentContractState.fundsDeposited) {
+      if (!currentContractState.clientSigned || !currentContractState.fundsDeposited) {
         console.log('Signing contract and depositing funds...');
         const signAndDepositTx = await contractInstance.clientSignAndDeposit(
           contract.contractId,
@@ -204,9 +207,9 @@ const ContractView = () => {
         for (let i = 0; i < MAX_VERIFY_RETRIES; i++) {
             try {
                 currentContractState = await contractInstance.getContract(contract.contractId);
-                console.log(`Attempt ${i + 1}: Fetched state - Client Approved: ${currentContractState.clientApproved}, Funds Deposited: ${currentContractState.fundsDeposited}`);
+                console.log(`Attempt ${i + 1}: Fetched state - Client Signed: ${currentContractState.clientSigned}, Funds Deposited: ${currentContractState.fundsDeposited}, Status: ${currentContractState.status}`);
                 
-                if (currentContractState.clientApproved && currentContractState.fundsDeposited) {
+                if (currentContractState.clientSigned && currentContractState.fundsDeposited && currentContractState.status === 1) { // Status.ClientSigned = 1
                     verificationSuccess = true;
                     console.log('State verification successful.');
                     break; // Exit loop if verification passes
@@ -535,12 +538,7 @@ const ContractView = () => {
   // Reject work handler
   const handleRejectWork = async () => {
     if (!rejectReason.trim()) {
-      toast.error('Please provide a reason for rejection.');
-      return;
-    }
-
-    if (!contract || !contract.contractAddress || contract.contractId === undefined) {
-      toast.error('Contract information is missing');
+      toast.error('Please provide a reason for rejection');
       return;
     }
 
@@ -580,7 +578,7 @@ const ContractView = () => {
       await disputeTx.wait();
 
       // Update the backend about the rejection and dispute
-      await contractService.rejectWork(contract.contractId, {
+      await contractService.rejectWork(contract._id, { // Changed from contract.contractId to contract._id
         rejectionReason: rejectReason,
         transactionHash: rejectTx.hash,
         disputeTransactionHash: disputeTx.hash
@@ -695,18 +693,20 @@ const ContractView = () => {
 
     setResolveLoading(true);
     try {
-      const response = await contractService.resolveDispute(contract.contractId, {
-        clientShare: ethers.utils.parseEther(clientShare),
-        freelancerShare: ethers.utils.parseEther(freelancerShare)
+      await resolveDisputeMutation.mutateAsync({
+        contractId: contract._id,
+        clientShare: parseFloat(clientShare),
+        freelancerShare: parseFloat(freelancerShare),
+        adminNote: 'Dispute resolved by admin via UI' // Add a default admin note
       });
       
       toast.success('Dispute resolved successfully');
       setShowResolveModal(false);
       setClientShare('');
       setFreelancerShare('');
-      onUpdate();
+      fetchContracts(false); // Refresh contracts after dispute resolution
     } catch (err) {
-      toast.error('Failed to resolve dispute: ' + (err.message || 'Unknown error'));
+      toast.error('Failed to resolve dispute: ' + (err.response?.data?.message || err.message || 'Unknown error'));
     } finally {
       setResolveLoading(false);
     }

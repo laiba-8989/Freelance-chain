@@ -168,7 +168,7 @@ export const useAdminApi = () => {
       queryKey: ['adminDisputeDetails', contractId],
       queryFn: async () => {
         const response = await axios.get(`${API_BASE_URL}/admin/disputes/${contractId}`, getRequestConfig());
-        return response.data.dispute;
+        return response.data.data;
       },
       enabled: !!account && !!contractId
     });

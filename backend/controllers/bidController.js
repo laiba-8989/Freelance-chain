@@ -4,6 +4,7 @@ const mongoose = require('mongoose');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const notificationService = require('../services/notificationService');
 
 // Configure multer for file uploads
 const storage = multer.diskStorage({
@@ -221,6 +222,9 @@ exports.submitBid = async (req, res) => {
 
     await bid.save();
 
+    // Create notification for job owner
+    await notificationService.notifyNewBid(job, bid);
+
     // Log successful bid creation
     console.log('Bid created successfully:', {
       bidId: bid._id,
@@ -291,7 +295,8 @@ exports.updateBidStatus = async (req, res) => {
       req.params.id,
       updateData,
       { new: true }
-    ).populate('freelancerId', 'name email profilePicture');
+    ).populate('freelancerId', 'name email profilePicture')
+     .populate('jobId', 'title clientId');
 
     if (!bid) {
       return res.status(404).json({
@@ -302,6 +307,9 @@ exports.updateBidStatus = async (req, res) => {
 
     if (status === 'accepted') {
       await Job.findByIdAndUpdate(bid.jobId, { status: 'in_progress' });
+      
+      // Notify freelancer about bid acceptance
+      await notificationService.notifyProposalAccepted(bid);
     }
 
     res.status(200).json({

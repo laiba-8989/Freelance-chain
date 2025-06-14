@@ -33,11 +33,11 @@ exports.sendMessage = async (req, res) => {
     // Get receiver ID (the other participant)
     const receiverId = conversation.participants.find(id => id.toString() !== senderId);
 
-    // Create notification for receiver
+    // Create notification for receiver using the new notification service
     await notificationService.notify(
       receiverId,
       'message',
-      text,
+      `New message: ${text.substring(0, 50)}${text.length > 50 ? '...' : ''}`,
       `/messages/${conversationId}`,
       req.app.get('io'),
       senderId
