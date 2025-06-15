@@ -477,14 +477,34 @@ const approveWork = async (contractId, signer) => {
 // Update raiseDispute to use getSigner and pass dispute fee
 const raiseDispute = async (contractId, disputeFee, signer) => {
     try {
+        console.log('Starting dispute raising process...');
+        console.log('Contract ID:', contractId);
+        console.log('Dispute Fee:', disputeFee);
+
         // Get signer from centralized utility
         const signerInstance = getSigner();
-        const provider = getProvider(); // Also get provider for wait
+        const provider = getProvider();
 
         const contractWithSigner = new ethers.Contract(JobContractAddress, CONTRACT_ABI, signerInstance);
 
         const id = typeof contractId === 'string' ? parseInt(contractId) : contractId;
         if (isNaN(id)) throw new Error('Invalid contractId');
+
+        // Get current contract state
+        console.log('Fetching current contract state...');
+        const currentState = await contractWithSigner.getContract(id);
+        console.log('Current contract state:', {
+            status: currentState.status.toString(),
+            statusName: ['Created', 'ClientSigned', 'BothSigned', 'WorkSubmitted', 'Disputed', 'Completed', 'Refunded'][currentState.status],
+            fundsDeposited: currentState.fundsDeposited.toString(),
+            client: currentState.client,
+            freelancer: currentState.freelancer
+        });
+
+        // Verify contract is in a valid state for dispute
+        if (currentState.status.toString() !== '3') { // 3 = WorkSubmitted
+            throw new Error(`Contract must be in WorkSubmitted state to raise dispute. Current state: ${currentState.status.toString()}`);
+        }
 
         console.log('Raising dispute for contract ID:', id, 'with fee:', disputeFee);
         const tx = await contractWithSigner.raiseDispute(id, { value: ethers.utils.parseEther(disputeFee.toString()) });
@@ -492,14 +512,36 @@ const raiseDispute = async (contractId, disputeFee, signer) => {
         console.log('Waiting for transaction confirmation...');
         const receipt = await provider.waitForTransaction(tx.hash);
 
-        if (receipt.status === 1) {
+        // Verify the state change
+        console.log('Verifying state change...');
+        const newState = await contractWithSigner.getContract(id);
+        console.log('New contract state:', {
+            status: newState.status.toString(),
+            statusName: ['Created', 'ClientSigned', 'BothSigned', 'WorkSubmitted', 'Disputed', 'Completed', 'Refunded'][newState.status],
+            fundsDeposited: newState.fundsDeposited.toString()
+        });
+
+        if (receipt.status === 1 && newState.status.toString() === '4') {
             console.log('Dispute raised successfully:', receipt.transactionHash);
-            return true;
+            return {
+                success: true,
+                transactionHash: receipt.transactionHash,
+                blockNumber: receipt.blockNumber,
+                newState: {
+                    status: newState.status.toString(),
+                    statusName: ['Created', 'ClientSigned', 'BothSigned', 'WorkSubmitted', 'Disputed', 'Completed', 'Refunded'][newState.status]
+                }
+            };
         } else {
-            throw new Error('Transaction failed');
+            throw new Error('Transaction failed or state not updated correctly');
         }
     } catch (error) {
-        console.error('Error raising dispute:', error);
+        console.error('Error raising dispute:', {
+            message: error.message,
+            code: error.code,
+            data: error.data,
+            reason: error.reason
+        });
         throw error;
     }
 };
@@ -536,69 +578,248 @@ const rejectWork = async (contractId, rejectionReason, signer) => {
     }
 };
 
-const resolveDispute = async (contractId, clientShare, freelancerShare) => {
+// Add getContract function
+const getContract = async (signer) => {
     try {
-        // Get signer and provider from centralized utilities
-        const signerInstance = getSigner();
-        const provider = getProvider();
-
-        const contractWithSigner = new ethers.Contract(JobContractAddress, CONTRACT_ABI, signerInstance);
-
-        const id = typeof contractId === 'string' ? parseInt(contractId) : contractId;
-        if (isNaN(id)) throw new Error('Invalid contractId');
-
-        // Ensure shares are BigNumber instances
-        const clientShareBN = ethers.BigNumber.from(clientShare);
-        const freelancerShareBN = ethers.BigNumber.from(freelancerShare);
-
-        console.log('Resolving dispute for contract ID:', id, 'with shares:', {
-            client: clientShareBN.toString(),
-            freelancer: freelancerShareBN.toString()
-        });
-
-        // Get current contract state to verify it's in dispute
-        const contractState = await contractWithSigner.getContract(id);
-        if (contractState.status !== 5) { // 5 is Disputed status
-            throw new Error('Contract is not in dispute status');
+        const contractAddress = process.env.CONTRACT_ADDRESS;
+        if (!contractAddress) {
+            throw new Error('Contract address not configured');
         }
 
-        // Get escrow balance to verify shares
-        const escrowBalance = await contractWithSigner.getEscrowBalance(id);
-        const totalShares = clientShareBN.add(freelancerShareBN);
-        
-        if (!totalShares.eq(escrowBalance)) {
-            throw new Error(`Total shares (${totalShares.toString()}) must equal escrow balance (${escrowBalance.toString()})`);
-        }
+        // Import the ABI
+        const contractABI = [
+            {
+                "inputs": [],
+                "stateMutability": "nonpayable",
+                "type": "constructor"
+            },
+            {
+                "inputs": [],
+                "name": "admin",
+                "outputs": [
+                    {
+                        "internalType": "address",
+                        "name": "",
+                        "type": "address"
+                    }
+                ],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [],
+                "name": "adminInitialized",
+                "outputs": [
+                    {
+                        "internalType": "bool",
+                        "name": "",
+                        "type": "bool"
+                    }
+                ],
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "inputs": [
+                    {
+                        "internalType": "uint256",
+                        "name": "contractId",
+                        "type": "uint256"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "clientShareBasisPoints",
+                        "type": "uint256"
+                    },
+                    {
+                        "internalType": "uint256",
+                        "name": "freelancerShareBasisPoints",
+                        "type": "uint256"
+                    }
+                ],
+                "name": "resolveDispute",
+                "outputs": [],
+                "stateMutability": "nonpayable",
+                "type": "function"
+            }
+        ];
 
-        // Call the smart contract's resolveDispute function
-        const tx = await contractWithSigner.resolveDispute(
-            id,
-            clientShareBN,
-            freelancerShareBN
+        // Create contract instance with signer
+        const contract = new ethers.Contract(
+            contractAddress,
+            contractABI,
+            signer
         );
 
-        console.log('Waiting for transaction confirmation...');
-        const receipt = await provider.waitForTransaction(tx.hash);
-
-        if (receipt.status === 1) {
-            console.log('Dispute resolved successfully:', receipt.transactionHash);
-            return true;
-        } else {
-            throw new Error('Transaction failed');
-        }
-    } catch (error) {
-        console.error('Error resolving dispute:', {
-            error: error.message,
-            code: error.code,
-            reason: error.reason,
-            data: error.data
+        console.log('Contract initialized:', {
+            address: contractAddress,
+            signer: await signer.getAddress()
         });
-        throw error;
+
+        return contract;
+    } catch (error) {
+        console.error('Error initializing contract:', error);
+        throw new Error(`Failed to initialize contract: ${error.message}`);
     }
 };
 
+async function resolveDispute(contractId, clientShare, freelancerShare) {
+    try {
+        console.log('Resolving dispute for contract:', contractId);
+        console.log('Shares - Client:', clientShare, 'Freelancer:', freelancerShare);
+
+        const signer = await getSigner();
+        if (!signer) {
+            throw new Error('Failed to get signer');
+        }
+
+        // Get contract instance
+        const contract = await getContract(signer);
+        if (!contract) {
+            throw new Error('Failed to get contract instance');
+        }
+
+        // Verify admin status
+        const adminAddress = await contract.admin();
+        const signerAddress = await signer.getAddress();
+        
+        console.log('Admin verification:', {
+            contractAdmin: adminAddress,
+            signerAddress: signerAddress,
+            isAdmin: adminAddress.toLowerCase() === signerAddress.toLowerCase()
+        });
+
+        if (adminAddress.toLowerCase() !== signerAddress.toLowerCase()) {
+            throw new Error('Only admin can resolve disputes');
+        }
+
+        // Convert percentages to basis points (1% = 100 basis points)
+        const clientShareBasisPoints = Math.floor(clientShare * 100);
+        const freelancerShareBasisPoints = Math.floor(freelancerShare * 100);
+
+        console.log('Converting shares to basis points:', {
+            clientShareBasisPoints,
+            freelancerShareBasisPoints
+        });
+
+        // Verify total is 100%
+        if (clientShareBasisPoints + freelancerShareBasisPoints !== 10000) {
+            throw new Error('Shares must total 100%');
+        }
+
+        // Set gas limit manually to avoid estimation issues
+        const gasLimit = 500000;
+
+        console.log('Sending resolve dispute transaction...');
+        const tx = await contract.resolveDispute(
+            contractId,
+            clientShareBasisPoints,
+            freelancerShareBasisPoints,
+            { gasLimit }
+        );
+
+        console.log('Transaction sent:', tx.hash);
+        const receipt = await tx.wait();
+        console.log('Transaction confirmed:', receipt);
+
+        return {
+            success: true,
+            transactionHash: receipt.transactionHash,
+            blockNumber: receipt.blockNumber
+        };
+    } catch (error) {
+        console.error('Error in resolveDispute:', {
+            message: error.message,
+            code: error.code,
+            data: error.data,
+            reason: error.reason
+        });
+        throw error;
+    }
+}
+
+// Add a new function to verify contract state
+async function verifyContractState(contractId) {
+  try {
+    console.log('Verifying contract state for ID:', contractId);
+    
+    const signer = await getSigner();
+    if (!signer) {
+      throw new Error('Failed to get signer');
+    }
+
+    const contract = await getContract(signer);
+    if (!contract) {
+      throw new Error('Failed to get contract instance');
+    }
+
+    console.log('Fetching contract details from blockchain...');
+    const contractDetails = await contract.getContract(contractId);
+    
+    // Log detailed state information
+    console.log('Contract state details:', {
+      status: contractDetails.status.toString(),
+      statusName: ['Created', 'ClientSigned', 'BothSigned', 'WorkSubmitted', 'Disputed', 'Completed', 'Refunded'][contractDetails.status],
+      fundsDeposited: contractDetails.fundsDeposited.toString(),
+      client: contractDetails.client,
+      freelancer: contractDetails.freelancer,
+      clientSigned: contractDetails.clientSigned,
+      freelancerSigned: contractDetails.freelancerSigned,
+      workSubmissionHash: contractDetails.workSubmissionHash || 'None'
+    });
+
+    // Check if contract is in dispute state
+    const isDisputed = contractDetails.status.toString() === '4';
+    console.log('Is contract disputed?', isDisputed);
+
+    // If not disputed, log the current state and what's needed
+    if (!isDisputed) {
+      console.log('Contract is not in dispute state. Current state:', {
+        status: contractDetails.status.toString(),
+        statusName: ['Created', 'ClientSigned', 'BothSigned', 'WorkSubmitted', 'Disputed', 'Completed', 'Refunded'][contractDetails.status],
+        requiredStatus: '4 (Disputed)'
+      });
+    }
+
+    return {
+      isDisputed,
+      status: contractDetails.status.toString(),
+      statusName: ['Created', 'ClientSigned', 'BothSigned', 'WorkSubmitted', 'Disputed', 'Completed', 'Refunded'][contractDetails.status],
+      fundsDeposited: contractDetails.fundsDeposited.toString(),
+      client: contractDetails.client,
+      freelancer: contractDetails.freelancer,
+      workSubmissionHash: contractDetails.workSubmissionHash || 'None'
+    };
+  } catch (error) {
+    console.error('Error verifying contract state:', {
+      message: error.message,
+      code: error.code,
+      data: error.data,
+      reason: error.reason
+    });
+    throw error;
+  }
+}
+
 // *** ACTION REQUIRED: Add similar updates for resolveDispute and requestRefund if they exist ***
 // Also review the parameters for clientSignAndDeposit and raiseDispute to ensure they receive necessary amounts.
+
+const requestRefund = async (contractId, signer) => {
+    // ... (existing code) ...
+};
+
+const getEscrowBalance = async (contractId) => {
+    try {
+        const provider = getProvider();
+        const contractInstance = new ethers.Contract(JobContractAddress, CONTRACT_ABI, provider);
+        const id = typeof contractId === 'string' ? parseInt(contractId) : contractId;
+        if (isNaN(id)) throw new Error('Invalid contractId');
+        return await contractInstance.getEscrowBalance(id);
+    } catch (error) {
+        console.error('Error fetching escrow balance:', error);
+        throw error;
+    }
+};
 
 module.exports = {
     // Removed initialize
@@ -611,6 +832,8 @@ module.exports = {
     approveWork,
     raiseDispute,
     rejectWork,
-    resolveDispute
-    // *** ACTION REQUIRED: Add resolveDispute and requestRefund to exports if implemented ***
+    resolveDispute,
+    verifyContractState,
+    getEscrowBalance,
+    getContract // Add getContract to exports
 };

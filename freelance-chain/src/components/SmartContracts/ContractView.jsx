@@ -564,27 +564,17 @@ const ContractView = () => {
         return;
       }
 
-      // First call rejectWork to log the reason
+      // Call rejectWork to log the reason and change status
       const rejectTx = await contractInstance.rejectWork(contract.contractId, rejectReason);
       await rejectTx.wait();
 
-      // Get dispute fee from contract
-      const disputeFee = await contractInstance.disputeFee();
-
-      // Then call raiseDispute to change status to disputed
-      const disputeTx = await contractInstance.raiseDispute(contract.contractId, {
-        value: disputeFee
-      });
-      await disputeTx.wait();
-
-      // Update the backend about the rejection and dispute
-      await contractService.rejectWork(contract._id, { // Changed from contract.contractId to contract._id
+      // Update the backend about the rejection
+      await contractService.rejectWork(contract._id, {
         rejectionReason: rejectReason,
-        transactionHash: rejectTx.hash,
-        disputeTransactionHash: disputeTx.hash
+        transactionHash: rejectTx.hash
       });
 
-      toast.success('Work rejected and dispute raised successfully');
+      toast.success('Work rejected successfully');
       setShowRejectModal(false);
       setRejectReason('');
       // Refetch contract data

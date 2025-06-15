@@ -6,7 +6,7 @@ const { CONTRACT_ABI } = require('./contractABI');
 const web3 = new Web3(process.env.PROVIDER_URL || 'https://rpc-vanguard.vanarchain.com');
 
 // Contract address - use environment variable or default to our deployed address
-const contractAddress = process.env.CONTRACT_ADDRESS || '0x1a2F1f5f3cF2D8502380405551e57EC787Dae708';
+const contractAddress = process.env.CONTRACT_ADDRESS || '0x39d0d7D3a924BA4d5f45c3CbE22F72eAd06c7521';
 
 // Create contract instance
 const contract = new web3.eth.Contract(CONTRACT_ABI, contractAddress);
