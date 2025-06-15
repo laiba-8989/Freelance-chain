@@ -3,20 +3,41 @@ const Conversation = require("../models/Conversation");
 const notificationService = require('../services/notificationService');
 
 exports.sendMessage = async (req, res) => {
-  const { conversationId, senderId, text } = req.body;
+  const { conversationId, senderId, text, projectId, jobId } = req.body;
 
   try {
-    // Validate conversationId and senderId
-    const conversation = await Conversation.findById(conversationId);
+    let conversation;
+    
+    // If no conversationId provided, find or create one
+    if (!conversationId) {
+      // Find existing conversation between these users
+      conversation = await Conversation.findOne({
+        participants: { $all: [senderId, req.body.receiverId] }
+      });
+      
+      if (!conversation) {
+        // Create new conversation
+        conversation = new Conversation({
+          participants: [senderId, req.body.receiverId],
+          project: projectId || null,
+          job: jobId || null
+        });
+        await conversation.save();
+      }
+    } else {
+      conversation = await Conversation.findById(conversationId);
+    }
+
     if (!conversation) {
       return res.status(404).json({ message: "Conversation not found" });
     }
+
     if (!conversation.participants.includes(senderId)) {
       return res.status(403).json({ message: "Sender is not a participant in the conversation" });
     }
 
     const message = new Message({
-      conversationId,
+      conversationId: conversation._id,
       senderId,
       text,
       timestamp: new Date(),
@@ -25,7 +46,7 @@ exports.sendMessage = async (req, res) => {
     await message.save();
 
     // Update last message and timestamp in conversation
-    await Conversation.findByIdAndUpdate(conversationId, {
+    await Conversation.findByIdAndUpdate(conversation._id, {
       lastMessage: text,
       updatedAt: new Date(),
     });
@@ -38,7 +59,7 @@ exports.sendMessage = async (req, res) => {
       receiverId,
       'message',
       `New message: ${text.substring(0, 50)}${text.length > 50 ? '...' : ''}`,
-      `/messages/${conversationId}`,
+      `/messages/${conversation._id}`,
       req.app.get('io'),
       senderId
     );

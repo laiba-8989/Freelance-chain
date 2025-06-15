@@ -12,9 +12,8 @@ const Layout = () => {
     setIsAdmin(adminStatus);
   }, []);
 
-  // List of routes where the footer should be hidden
-  const hideFooterRoutes = ['/messages'];
-  const shouldHideFooter = hideFooterRoutes.includes(location.pathname);
+  // Check if the current path starts with any of the routes where footer should be hidden
+  const shouldHideFooter = location.pathname.startsWith('/messages');
 
   return (
     <div className="app-container min-h-screen flex flex-col">
