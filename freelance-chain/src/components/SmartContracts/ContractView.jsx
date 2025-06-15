@@ -7,7 +7,7 @@ import WorkSubmission from './WorkSubmission';
 import { toast } from 'sonner';
 import { ethers } from 'ethers';
 import { CONTRACT_ABI } from '../../../utils/contract'; // Adjust path if needed
-import { Download, FileText } from 'lucide-react';
+import { Download, FileText, Star } from 'lucide-react';
 import { downloadFromIPFS, downloadWorkSubmission } from '../../services/ipfsService';
 import Modal from '../Modal'; // Updated import path
 import { useAuth } from '../../AuthContext';
@@ -50,6 +50,12 @@ const ContractView = () => {
   const [showResolveModal, setShowResolveModal] = useState(false);
   const [clientShare, setClientShare] = useState('');
   const [freelancerShare, setFreelancerShare] = useState('');
+  const [showRatingModal, setShowRatingModal] = useState(false);
+  const [rating, setRating] = useState(0);
+  const [hoverRating, setHoverRating] = useState(0);
+  const [ratingComment, setRatingComment] = useState('');
+  const [ratingLoading, setRatingLoading] = useState(false);
+  const [hasRated, setHasRated] = useState(false);
 
   // Find the specific contract being viewed from the context
   const contract = useMemo(() => {
@@ -506,8 +512,8 @@ const ContractView = () => {
 
       if (receipt.status === 1) {
         toast.success('Work approved successfully!');
-        // Refetch contract to update UI
-        fetchContracts(false); // Fetch silently
+        setShowRatingModal(true);
+        fetchContracts(false);
       } else {
         throw new Error('Approve work transaction failed on chain.');
       }
@@ -709,6 +715,26 @@ const ContractView = () => {
       toast.error('Failed to resolve dispute: ' + (err.response?.data?.message || err.message || 'Unknown error'));
     } finally {
       setResolveLoading(false);
+    }
+  };
+
+  // Modify the handleSubmitRating function to work without backend
+  const handleSubmitRating = () => {
+    if (rating === 0) {
+      toast.error('Please select a rating');
+      return;
+    }
+
+    setRatingLoading(true);
+    try {
+      // Just update the local state
+      setHasRated(true);
+      toast.success('Rating submitted successfully');
+      setShowRatingModal(false);
+    } catch (err) {
+      toast.error('Failed to submit rating');
+    } finally {
+      setRatingLoading(false);
     }
   };
 
@@ -1098,6 +1124,97 @@ const ContractView = () => {
                 disabled={resolveLoading}
               >
                 {resolveLoading ? 'Resolving...' : 'Resolve Dispute'}
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Add Rating Display after rating is submitted */}
+      {hasRated && (
+        <div className="mt-4 p-4 bg-gray-50 rounded-lg">
+          <h3 className="text-lg font-medium text-gray-900 mb-2">Your Rating</h3>
+          <div className="flex items-center space-x-2">
+            {[1, 2, 3, 4, 5].map((star) => (
+              <Star
+                key={star}
+                className={`w-5 h-5 ${
+                  star <= rating
+                    ? 'text-yellow-400 fill-current'
+                    : 'text-gray-300'
+                }`}
+              />
+            ))}
+            <span className="text-sm text-gray-600 ml-2">
+              ({rating} star{rating === 1 ? '' : 's'})
+            </span>
+          </div>
+          {ratingComment && (
+            <p className="mt-2 text-sm text-gray-600">
+              "{ratingComment}"
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Rating Modal */}
+      {showRatingModal && (
+        <Modal 
+          isOpen={showRatingModal}
+          onClose={() => setShowRatingModal(false)}
+          title="Rate Freelancer"
+        >
+          <div className="space-y-4">
+            <div className="flex justify-center space-x-2">
+              {[1, 2, 3, 4, 5].map((star) => (
+                <button
+                  key={star}
+                  type="button"
+                  onClick={() => setRating(star)}
+                  onMouseEnter={() => setHoverRating(star)}
+                  onMouseLeave={() => setHoverRating(0)}
+                  className="focus:outline-none"
+                >
+                  <Star
+                    className={`w-8 h-8 ${
+                      star <= (hoverRating || rating)
+                        ? 'text-yellow-400 fill-current'
+                        : 'text-gray-300'
+                    }`}
+                  />
+                </button>
+              ))}
+            </div>
+            <div className="text-center text-sm text-gray-500">
+              {rating === 0
+                ? 'Select a rating'
+                : `${rating} star${rating === 1 ? '' : 's'}`}
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Comments (optional)
+              </label>
+              <textarea
+                value={ratingComment}
+                onChange={(e) => setRatingComment(e.target.value)}
+                className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-primary focus:border-primary"
+                rows={3}
+                placeholder="Share your experience working with this freelancer..."
+              />
+            </div>
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => setShowRatingModal(false)}
+                className="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300"
+              >
+                Skip
+              </button>
+              <button
+                onClick={handleSubmitRating}
+                disabled={ratingLoading}
+                className="px-4 py-2 bg-primary text-white rounded hover:bg-opacity-90 disabled:opacity-70"
+              >
+                {ratingLoading ? 'Submitting...' : 'Submit Rating'}
               </button>
             </div>
           </div>
