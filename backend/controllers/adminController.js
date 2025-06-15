@@ -442,7 +442,7 @@ const adminController = {
 
       // Create contract instance
       const contractInstance = new ethers.Contract(
-        process.env.CONTRACT_ADDRESS || '0x39d0d7D3a924BA4d5f45c3CbE22F72eAd06c7521',
+        process.env.CONTRACT_ADDRESS || '0x8d4961C7db7426242e93D5197bCa280f398Ac2F8',
         CONTRACT_ABI,
         signer
       );
