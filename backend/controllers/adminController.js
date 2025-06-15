@@ -14,6 +14,7 @@ const { resolveDispute: resolveDisputeOnChain } = require('../utils/contractUtil
 const { getSigner } = require('../utils/web3Utils');
 const express = require('express');
 const ethers = require('ethers');
+const { getAdminNameByWallet } = require('../middleware/adminAuth');
 
 const adminController = {
   // Dashboard stats
@@ -67,12 +68,23 @@ const adminController = {
         .limit(parseInt(limit))
         .sort({ createdAt: -1 });
 
+      // Add admin names for admin users
+      const usersWithAdminNames = users.map(user => {
+        if (user.role === 'admin') {
+          return {
+            ...user.toObject(),
+            name: getAdminNameByWallet(user.walletAddress) || user.name
+          };
+        }
+        return user;
+      });
+
       const total = await User.countDocuments(query);
 
       res.json({
         success: true,
         data: {
-          users,
+          users: usersWithAdminNames,
           total,
           pages: Math.ceil(total / limit),
           currentPage: parseInt(page)
