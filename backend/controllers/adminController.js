@@ -399,23 +399,9 @@ const adminController = {
         return res.status(404).json({ message: 'Contract not found' });
       }
 
-      console.log('Contract found for dispute resolution:', {
-        _id: contract._id,
-        contractId: contract.contractId,
-        currentStatus: contract.status,
-        statusType: typeof contract.status,
-        allFields: Object.keys(contract),
-        rawContract: JSON.stringify(contract)
-      });
-
       // Check for both disputed and work_rejected statuses
       const validStatuses = ['disputed', 'work_rejected'];
       if (!validStatuses.includes(contract.status.toLowerCase())) {
-        console.log('Status mismatch:', {
-          expected: validStatuses,
-          actual: contract.status,
-          comparison: validStatuses.includes(contract.status.toLowerCase())
-        });
         return res.status(400).json({ 
           message: 'Contract is not in dispute',
           details: {
@@ -423,12 +409,6 @@ const adminController = {
             expectedStatuses: validStatuses
           }
         });
-      }
-
-      // Get blockchain contract ID
-      const blockchainContractId = contract.contractId;
-      if (!blockchainContractId) {
-        return res.status(400).json({ message: 'Contract has no blockchain ID' });
       }
 
       // Get signer
@@ -442,7 +422,7 @@ const adminController = {
 
       // Create contract instance
       const contractInstance = new ethers.Contract(
-        process.env.CONTRACT_ADDRESS || '0x8d4961C7db7426242e93D5197bCa280f398Ac2F8',
+        process.env.CONTRACT_ADDRESS,
         CONTRACT_ABI,
         signer
       );
@@ -451,13 +431,13 @@ const adminController = {
       let tx;
       try {
         console.log('Sending resolveDispute transaction:', {
-          contractId: blockchainContractId,
+          contractId: numericContractId,
           clientShare,
           freelancerShare
         });
 
         tx = await contractInstance.resolveDispute(
-          blockchainContractId,
+          numericContractId,
           clientShare,
           freelancerShare
         );

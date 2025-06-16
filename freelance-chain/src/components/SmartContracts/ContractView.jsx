@@ -29,6 +29,17 @@ const getBackendFileUrl = (hash) => {
   return `${API_URL}/api/ipfs/download/${encodeURIComponent(hash)}`;
 };
 
+const MAX_RETRIES = 5;
+const INITIAL_DELAY = 2000;
+const MAX_DELAY = 30000;
+
+const calculateDelay = (attempt) => {
+  const delay = Math.min(INITIAL_DELAY * Math.pow(2, attempt), MAX_DELAY);
+  return delay + Math.random() * 1000; // Add jitter
+};
+
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
 const ContractView = () => {
   const { contractId } = useParams();
   const navigate = useNavigate();
@@ -265,131 +276,158 @@ const ContractView = () => {
   };
 
   const handleFreelancerSign = async () => {
-    try {
-      if (!contract) return;
-      if (!contract.contractAddress || contract.contractId === undefined) {
-        toast.error('Contract address or ID missing');
-        return;
-      }
-      if (!window.ethereum) {
-        toast.error('MetaMask not detected');
-        return;
-      }
-
-      // Connect to MetaMask
-      const provider = new ethers.providers.Web3Provider(window.ethereum, {
-        name: 'Vanguard',
-        chainId: 78600,
-        ensAddress: null
-      });
-      const signer = provider.getSigner();
-      const contractInstance = new ethers.Contract(
-        contract.contractAddress,
-        CONTRACT_ABI,
-        signer
-      );
-
-      // First check contract state
-      const contractData = await contractInstance.getContract(contract.contractId);
-      console.log('Current contract state before signing:', {
-        status: contractData.status,
-        clientSigned: contractData.clientSigned,
-        freelancerSigned: contractData.freelancerSigned,
-        fundsDeposited: contractData.fundsDeposited,
-        client: contractData.client,
-        freelancer: contractData.freelancer
-      });
-
-      // Verify freelancer is the correct signer
-      const freelancerAddress = await signer.getAddress();
-      console.log('Freelancer address check:', {
-        signerAddress: freelancerAddress,
-        contractFreelancer: contractData.freelancer,
-        isMatch: freelancerAddress.toLowerCase() === contractData.freelancer.toLowerCase()
-      });
-
-      if (freelancerAddress.toLowerCase() !== contractData.freelancer.toLowerCase()) {
-        toast.error('Only the contract freelancer can sign');
-        return;
-      }
-
-      // Check if client has already signed and deposited funds
-      if (contractData.status !== 1) {
-        console.error('Contract status check failed:', {
-          currentStatus: contractData.status,
-          expectedStatus: 1,
-          clientSigned: contractData.clientSigned,
-          fundsDeposited: contractData.fundsDeposited
-        });
-        toast.error('Client must sign and deposit funds first');
-        return;
-      }
-
-      // Get current gas price and add 20% buffer
-      const gasPrice = await provider.getGasPrice();
-      const bufferedGasPrice = gasPrice.mul(120).div(100);
-      console.log('Gas price with buffer:', ethers.utils.formatUnits(bufferedGasPrice, 'gwei'), 'gwei');
-
-      // Use a fixed gas limit for signing
-      const signGasLimit = 200000;
-
-      console.log('Attempting to sign contract with parameters:', {
-        contractId: contract.contractId,
-        gasPrice: ethers.utils.formatUnits(bufferedGasPrice, 'gwei'),
-        gasLimit: signGasLimit
-      });
-
-      // Sign contract using freelancerSign function
-      const tx = await contractInstance.freelancerSign(
-        contract.contractId,
-        { 
-          gasPrice: bufferedGasPrice,
-          gasLimit: signGasLimit
+    let lastError;
+    
+    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+      try {
+        if (!contract) return;
+        if (!contract.contractAddress || contract.contractId === undefined) {
+          toast.error('Contract address or ID missing');
+          return;
         }
-      );
-      console.log('Transaction sent:', tx.hash);
-      
-      // Wait for transaction confirmation
-      const receipt = await tx.wait();
-      console.log('Transaction confirmed:', receipt);
+        if (!window.ethereum) {
+          toast.error('MetaMask not detected');
+          return;
+        }
 
-      if (receipt.status === 0) {
-        throw new Error('Transaction failed - contract requirements not met');
+        // Add a small delay before each attempt
+        if (attempt > 0) {
+          const delay = calculateDelay(attempt);
+          console.log(`Retry attempt ${attempt + 1}, waiting ${delay}ms...`);
+          await sleep(delay);
+        }
+
+        // Connect to MetaMask
+        const provider = new ethers.providers.Web3Provider(window.ethereum, {
+          name: 'Vanguard',
+          chainId: 78600,
+          ensAddress: null
+        });
+        const signer = provider.getSigner();
+        const contractInstance = new ethers.Contract(
+          contract.contractAddress,
+          CONTRACT_ABI,
+          signer
+        );
+
+        // First check contract state
+        const contractData = await contractInstance.getContract(contract.contractId);
+        console.log('Current contract state before signing:', {
+          status: contractData.status,
+          clientSigned: contractData.clientSigned,
+          freelancerSigned: contractData.freelancerSigned,
+          fundsDeposited: contractData.fundsDeposited,
+          client: contractData.client,
+          freelancer: contractData.freelancer
+        });
+
+        // Verify freelancer is the correct signer
+        const freelancerAddress = await signer.getAddress();
+        console.log('Freelancer address check:', {
+          signerAddress: freelancerAddress,
+          contractFreelancer: contractData.freelancer,
+          isMatch: freelancerAddress.toLowerCase() === contractData.freelancer.toLowerCase()
+        });
+
+        if (freelancerAddress.toLowerCase() !== contractData.freelancer.toLowerCase()) {
+          toast.error('Only the contract freelancer can sign');
+          return;
+        }
+
+        // Check if client has already signed and deposited funds
+        if (contractData.status !== 1) {
+          console.error('Contract status check failed:', {
+            currentStatus: contractData.status,
+            expectedStatus: 1,
+            clientSigned: contractData.clientSigned,
+            fundsDeposited: contractData.fundsDeposited
+          });
+          toast.error('Client must sign and deposit funds first');
+          return;
+        }
+
+        // Get current gas price and add 20% buffer
+        const gasPrice = await provider.getGasPrice();
+        const bufferedGasPrice = gasPrice.mul(120).div(100);
+        console.log('Gas price with buffer:', ethers.utils.formatUnits(bufferedGasPrice, 'gwei'), 'gwei');
+
+        // Use a fixed gas limit for signing
+        const signGasLimit = 200000;
+
+        console.log('Attempting to sign contract with parameters:', {
+          contractId: contract.contractId,
+          gasPrice: ethers.utils.formatUnits(bufferedGasPrice, 'gwei'),
+          gasLimit: signGasLimit
+        });
+
+        // Sign contract using freelancerSign function
+        const tx = await contractInstance.freelancerSign(
+          contract.contractId,
+          { 
+            gasPrice: bufferedGasPrice,
+            gasLimit: signGasLimit
+          }
+        );
+        console.log('Transaction sent:', tx.hash);
+        
+        // Wait for transaction confirmation
+        const receipt = await tx.wait();
+        console.log('Transaction confirmed:', receipt);
+
+        if (receipt.status === 0) {
+          throw new Error('Transaction failed - contract requirements not met');
+        }
+
+        // Verify signing was successful
+        const updatedContractData = await contractInstance.getContract(contract.contractId);
+        console.log('Contract state after signing:', {
+          status: updatedContractData.status,
+          clientSigned: updatedContractData.clientSigned,
+          freelancerSigned: updatedContractData.freelancerSigned,
+          fundsDeposited: updatedContractData.fundsDeposited
+        });
+
+        if (!updatedContractData.freelancerSigned) {
+          throw new Error('Signing verification failed');
+        }
+
+        toast.success('Contract signed successfully!');
+        
+        // Refetch all contracts to ensure UI is updated with the latest state
+        await fetchContracts(false); // Fetch silently without toast
+        return; // Success - exit the retry loop
+
+      } catch (err) {
+        console.error(`Signing attempt ${attempt + 1} failed:`, err);
+        lastError = err;
+
+        // Check if we should retry
+        const shouldRetry = 
+          err.code === -32603 || // Rate limit error
+          err.code === -32005 || // Another rate limit error code
+          err.message?.includes('rate limit') ||
+          err.message?.includes('timeout') ||
+          err.message?.includes('nonce too low') ||
+          err.message?.includes('already known');
+
+        if (!shouldRetry || attempt === MAX_RETRIES - 1) {
+          // Don't retry if it's not a retryable error or we've exhausted retries
+          let errorMessage = 'Failed to sign contract';
+          
+          if (err.code === 'UNPREDICTABLE_GAS_LIMIT') {
+            errorMessage = 'Failed to estimate gas. Please try again or contact support.';
+          } else if (err.code === 'NONCE_EXPIRED') {
+            errorMessage = 'Transaction expired. Please try again.';
+          } else if (err.code === 'CALL_EXCEPTION') {
+            errorMessage = 'Transaction failed. Please check contract requirements.';
+          } else if (err.message && err.message.includes('execution reverted')) {
+            errorMessage = `Transaction failed: ${err.message.split('execution reverted:')[1] || err.message}`;
+          }
+          
+          toast.error(errorMessage);
+          return;
+        }
       }
-
-      // Verify signing was successful
-      const updatedContractData = await contractInstance.getContract(contract.contractId);
-      console.log('Contract state after signing:', {
-        status: updatedContractData.status,
-        clientSigned: updatedContractData.clientSigned,
-        freelancerSigned: updatedContractData.freelancerSigned,
-        fundsDeposited: updatedContractData.fundsDeposited
-      });
-
-      if (!updatedContractData.freelancerSigned) {
-        throw new Error('Signing verification failed');
-      }
-
-      toast.success('Contract signed successfully!');
-      
-      // Refetch all contracts to ensure UI is updated with the latest state
-      await fetchContracts(false); // Fetch silently without toast
-    } catch (err) {
-      console.error('Signing failed:', err);
-      let errorMessage = 'Failed to sign contract';
-      
-      // Handle specific error cases
-      if (err.code === 'UNPREDICTABLE_GAS_LIMIT') {
-        errorMessage = 'Failed to estimate gas. Please try again or contact support.';
-      } else if (err.code === 'NONCE_EXPIRED') {
-        errorMessage = 'Transaction expired. Please try again.';
-      } else if (err.code === 'CALL_EXCEPTION') {
-        errorMessage = 'Transaction failed. Please check contract requirements.';
-      } else if (err.message && err.message.includes('execution reverted')) {
-        errorMessage = `Transaction failed: ${err.message.split('execution reverted:')[1] || err.message}`;
-      }
-      
-      toast.error(errorMessage);
     }
   };
 
@@ -568,7 +606,7 @@ const ContractView = () => {
       const rejectTx = await contractInstance.rejectWork(contract.contractId, rejectReason);
       await rejectTx.wait();
 
-      // Update the backend about the rejection
+      // Update the backend about the rejection using the MongoDB _id
       await contractService.rejectWork(contract._id, {
         rejectionReason: rejectReason,
         transactionHash: rejectTx.hash

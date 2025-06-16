@@ -1,160 +1,241 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useDisputes, useResolveDispute } from '../../hooks/useDisputeApi';
 import { useWeb3 } from '../../context/Web3Context';
-import { toast } from 'sonner';
+import { toast } from 'react-hot-toast';
 import { useQueryClient } from '@tanstack/react-query';
 import { ethers } from 'ethers';
+import { CONTRACT_ADDRESS, CONTRACT_ABI } from '../../utils/contract';
+import { useAdminApi } from '../../hooks/useAdminApi';
 
 const Disputes = () => {
-  const { account } = useWeb3();
-  const { data: disputes = [], isLoading, error, refetch } = useDisputes();
-  const resolveDispute = useResolveDispute();
+  const { account, provider } = useWeb3();
+  const { data: disputesData, isLoading: isLoadingDisputes, error: disputesError } = useDisputes();
+  const resolveDisputeMutation = useResolveDispute();
   const [selectedDispute, setSelectedDispute] = useState(null);
-  const [clientShare, setClientShare] = useState(50);
-  const [freelancerShare, setFreelancerShare] = useState(50);
+  const [clientShare, setClientShare] = useState(5000); // 50% in basis points
+  const [freelancerShare, setFreelancerShare] = useState(5000); // 50% in basis points
   const [adminNote, setAdminNote] = useState('');
   const [isResolving, setIsResolving] = useState(false);
+  const [isAdminVerified, setIsAdminVerified] = useState(false);
+  const [isAddingAdmin, setIsAddingAdmin] = useState(false);
   const queryClient = useQueryClient();
 
-  const calculateAmounts = () => {
-    if (!selectedDispute?.bidAmount) return { clientAmount: '0', freelancerAmount: '0' };
+  const [disputes, setDisputes] = useState([]);
+
+  useEffect(() => {
+    if (disputesData) {
+      setDisputes(disputesData);
+    }
+  }, [disputesData]);
+
+  // Add admin function
+  const addAdmin = async () => {
+    if (!account) {
+      toast.error('Please connect your wallet first');
+      return;
+    }
 
     try {
-      // Convert bid amount to smallest unit (VG has 18 decimals like ETH)
-      const bidAmountWei = ethers.utils.parseUnits(selectedDispute.bidAmount.toString(), 18);
-      
-      // Calculate platform fee (5%)
-      const platformFeeWei = bidAmountWei.mul(500).div(10000); // 5% = 500 basis points
-      
-      // Calculate remaining amount after platform fee
-      const remainingAmountWei = bidAmountWei.sub(platformFeeWei);
-      
-      // Calculate client and freelancer shares
-      const clientAmountWei = remainingAmountWei.mul(clientShare).div(10000);
-      const freelancerAmountWei = remainingAmountWei.sub(clientAmountWei);
-      
-      // Convert back to VG for display
-      return {
-        clientAmount: ethers.utils.formatUnits(clientAmountWei, 18),
-        freelancerAmount: ethers.utils.formatUnits(freelancerAmountWei, 18)
-      };
+      setIsAddingAdmin(true);
+      const provider = new ethers.providers.Web3Provider(window.ethereum);
+      const signer = provider.getSigner();
+      const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
+
+      // Get the current admin
+      const currentAdmin = await contract.admin();
+      console.log('Current admin:', currentAdmin);
+
+      // Check if the current user is the admin
+      if (currentAdmin.toLowerCase() !== account.toLowerCase()) {
+        toast.error('Only the contract owner can add new admins');
+        return;
+      }
+
+      // Add the new admin
+      const tx = await contract.addAdmin(account);
+      await tx.wait();
+
+      // Verify admin status
+      const isAdmin = await contract.isAdmin(account);
+      if (isAdmin) {
+        setIsAdminVerified(true);
+        toast.success('Successfully added as admin');
+      } else {
+        toast.error('Failed to verify admin status');
+      }
     } catch (error) {
-      console.error('Error calculating amounts:', error);
-      return { clientAmount: '0', freelancerAmount: '0' };
+      console.error('Error adding admin:', error);
+      if (error.message?.includes('Only contract owner can add admins')) {
+        toast.error('Only the contract owner can add new admins');
+      } else {
+        toast.error('Failed to add admin: ' + error.message);
+      }
+    } finally {
+      setIsAddingAdmin(false);
     }
   };
 
-  const handleResolveDispute = async (dispute) => {
+  // Verify admin status
+  useEffect(() => {
+    const verifyAdmin = async () => {
+      if (!account || !provider) return;
+
+      try {
+        const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, provider);
+        const contractAdmin = await contract.admin();
+        setIsAdminVerified(contractAdmin.toLowerCase() === '0x3Ff804112919805fFB8968ad81dBb23b32e8F3f1'.toLowerCase());
+        
+        if (!isAdminVerified) {
+          console.log('Wallet is not registered as admin');
+        }
+      } catch (error) {
+        console.error('Error verifying admin status:', error);
+        toast.error('Failed to verify admin status');
+      }
+    };
+
+    verifyAdmin();
+  }, [account, provider]);
+
+  const calculateAmounts = () => {
+    if (!selectedDispute) {
+      return {
+        clientAmount: '0',
+        freelancerAmount: '0',
+        platformFee: '0'
+      };
+    }
+
     try {
-      if (!dispute || !dispute.contractId) {
-        toast.error('Invalid dispute data');
-        return;
-      }
+      const bidAmount = ethers.utils.parseEther(selectedDispute.bidAmount.toString());
+      const disputeFee = selectedDispute.disputeFee ? 
+        ethers.utils.parseEther(selectedDispute.disputeFee.toString()) : 
+        ethers.BigNumber.from(0);
 
-      if (!account) {
-        toast.error('Please connect your wallet first');
-        return;
-      }
+      const totalAmount = bidAmount.add(disputeFee);
+      const platformFee = totalAmount.mul(5).div(100); // 5% platform fee
+      const remainingAmount = totalAmount.sub(platformFee);
 
-      const adminWallet = localStorage.getItem('adminWalletAddress');
-      const verifiedAdmin = localStorage.getItem('verifiedAdmin');
+      const clientAmount = remainingAmount.mul(clientShare).div(10000);
+      const freelancerAmount = remainingAmount.sub(clientAmount);
 
-      if (!adminWallet || verifiedAdmin !== 'true') {
-        toast.error('Admin verification required');
-        return;
-      }
+      return {
+        clientAmount: ethers.utils.formatEther(clientAmount),
+        freelancerAmount: ethers.utils.formatEther(freelancerAmount),
+        platformFee: ethers.utils.formatEther(platformFee)
+      };
+    } catch (error) {
+      console.error('Error calculating amounts:', error);
+      return {
+        clientAmount: '0',
+        freelancerAmount: '0',
+        platformFee: '0'
+      };
+    }
+  };
 
-      const normalizedAccount = account.toLowerCase();
-      const normalizedStoredWallet = adminWallet.toLowerCase();
+  const handleResolveDispute = async () => {
+    if (!selectedDispute) return;
 
-      if (normalizedStoredWallet !== normalizedAccount) {
-        toast.error('Connected wallet does not match admin wallet');
-        return;
-      }
+    try {
+      setIsResolving(true);
 
-      // Validate shares
-      if (clientShare < 0 || clientShare > 100 || freelancerShare < 0 || freelancerShare > 100) {
-        toast.error('Shares must be between 0 and 100');
-        return;
-      }
-
-      if (clientShare + freelancerShare !== 100) {
-        toast.error('Shares must total 100%');
-        return;
-      }
-
-      if (!adminNote || adminNote.trim() === '') {
-        toast.error('Please provide a resolution note');
-        return;
-      }
-
-      // Convert percentages to basis points
-      const clientShareBasisPoints = Math.round(clientShare * 100);
-      const freelancerShareBasisPoints = Math.round(freelancerShare * 100);
-
-      console.log('Resolving dispute:', {
-        contractId: dispute.contractId,
-        clientShare: clientShareBasisPoints,
-        freelancerShare: freelancerShareBasisPoints,
-        adminNote,
-        adminWallet: normalizedStoredWallet
+      // First verify admin status
+      const provider = new ethers.providers.Web3Provider(window.ethereum);
+      const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, provider);
+      
+      // Get the current admin and check admin status
+      const contractAdmin = await contract.admin();
+      const isAdmin = await contract.isAdmin(account);
+      console.log('Admin status check:', { 
+        account, 
+        contractAdmin,
+        isAdmin,
+        isTrustedAdmin: ADMIN_WALLET_ADDRESSES.includes(account.toLowerCase())
       });
 
-      await resolveDispute.mutateAsync({
-        contractId: parseInt(dispute.contractId),
-        clientShare: clientShareBasisPoints,
-        freelancerShare: freelancerShareBasisPoints,
+      if (!isAdmin && contractAdmin.toLowerCase() !== account.toLowerCase()) {
+        toast.error('Your wallet is not registered as an admin in the contract');
+        return;
+      }
+
+      // Proceed with dispute resolution
+      await resolveDisputeMutation.mutateAsync({
+        contractId: selectedDispute.contractId,
+        clientShare,
+        freelancerShare,
         adminNote
       });
 
-      // Add a delay to allow backend to process state update
-      await new Promise(resolve => setTimeout(resolve, 3000)); // 3-second delay
-
+      // Refresh disputes list
+      queryClient.invalidateQueries(['adminDisputes']);
+      
+      // Reset form
       setSelectedDispute(null);
-      setClientShare(50);
-      setFreelancerShare(50);
+      setClientShare(5000);
+      setFreelancerShare(5000);
       setAdminNote('');
+      
+      toast.success('Dispute resolved successfully');
     } catch (error) {
       console.error('Error resolving dispute:', error);
-      toast.error(error.message || 'Failed to resolve dispute');
+      if (error.message?.includes('Only admin can call this')) {
+        toast.error('Your wallet is not registered as an admin in the contract');
+      } else {
+        toast.error(error.response?.data?.message || 'Failed to resolve dispute');
+      }
+    } finally {
+      setIsResolving(false);
     }
   };
 
   const handleSelectDispute = (dispute) => {
     setSelectedDispute(dispute);
-    // Reset shares to default 50-50
-    setClientShare(50);
-    setFreelancerShare(50);
+    setClientShare(5000);
+    setFreelancerShare(5000);
     setAdminNote('');
   };
 
   const handleShareChange = (e, type) => {
     const value = parseInt(e.target.value);
-    if (isNaN(value)) return;
-
     if (type === 'client') {
       setClientShare(value);
-      setFreelancerShare(100 - value);
+      setFreelancerShare(10000 - value);
     } else {
       setFreelancerShare(value);
-      setClientShare(100 - value);
+      setClientShare(10000 - value);
     }
   };
-
-  const amounts = calculateAmounts();
 
   if (!account) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
-          <h2 className="text-xl font-semibold text-gray-700">Please connect your wallet</h2>
-          <p className="mt-2 text-gray-500">You need to connect your wallet to access the admin panel</p>
+          <h2 className="text-xl font-semibold text-gray-600">Please connect your wallet</h2>
         </div>
       </div>
     );
   }
 
-  if (isLoading) {
+  if (!isAdminVerified) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <h2 className="text-xl font-semibold text-red-600">Admin Access Required</h2>
+          <p className="mt-2 text-gray-500">Your wallet is not registered as an admin in the contract.</p>
+          <button
+            onClick={addAdmin}
+            disabled={isAddingAdmin}
+            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+          >
+            {isAddingAdmin ? 'Adding Admin...' : 'Add Admin'}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (isLoadingDisputes) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
@@ -165,12 +246,12 @@ const Disputes = () => {
     );
   }
 
-  if (error) {
+  if (disputesError) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <h2 className="text-xl font-semibold text-red-600">Error loading disputes</h2>
-          <p className="mt-2 text-gray-500">{error.message}</p>
+          <p className="mt-2 text-gray-500">{disputesError.message}</p>
         </div>
       </div>
     );
@@ -299,41 +380,41 @@ const Disputes = () => {
               <div className="bg-gray-50 p-4 rounded-lg mb-4">
                 <h3 className="font-medium mb-2">Contract Amount</h3>
                 <p className="text-lg font-semibold text-green-600">
-                  {amounts.totalAmount} VANRY
+                  {calculateAmounts().totalAmount} VANRY
                 </p>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Client Share (%)
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Client Share (basis points)
                 </label>
                 <input
                   type="number"
                   min="0"
-                  max="100"
+                  max="10000"
                   value={clientShare}
                   onChange={(e) => handleShareChange(e, 'client')}
                   className="w-full px-3 py-2 border rounded-md"
                 />
-                <p className="mt-1 text-sm text-gray-600">
-                  Amount: {amounts.clientAmount} VANRY
+                <p className="text-sm text-gray-500 mt-1">
+                  {clientShare / 100}% of remaining amount
                 </p>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Freelancer Share (%)
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Freelancer Share (basis points)
                 </label>
                 <input
                   type="number"
                   min="0"
-                  max="100"
+                  max="10000"
                   value={freelancerShare}
                   onChange={(e) => handleShareChange(e, 'freelancer')}
                   className="w-full px-3 py-2 border rounded-md"
                 />
-                <p className="mt-1 text-sm text-gray-600">
-                  Amount: {amounts.freelancerAmount} VANRY
+                <p className="text-sm text-gray-500 mt-1">
+                  {freelancerShare / 100}% of remaining amount
                 </p>
               </div>
 
@@ -342,9 +423,9 @@ const Disputes = () => {
                   <span className="font-semibold">Total Share:</span> {clientShare + freelancerShare}%
                 </p>
                 <p className="text-sm text-yellow-700">
-                  <span className="font-semibold">Total Amount:</span> {amounts.totalAmount} VANRY
+                  <span className="font-semibold">Total Amount:</span> {calculateAmounts().totalAmount} VANRY
                 </p>
-                {clientShare + freelancerShare !== 100 && (
+                {clientShare + freelancerShare !== 10000 && (
                   <p className="text-sm text-red-500 mt-1">Shares must total exactly 100%</p>
                 )}
               </div>
@@ -364,10 +445,10 @@ const Disputes = () => {
 
               <div className="pt-4">
                 <button
-                  onClick={() => handleResolveDispute(selectedDispute)}
-                  disabled={isResolving || clientShare + freelancerShare !== 100}
+                  onClick={handleResolveDispute}
+                  disabled={isResolving || clientShare + freelancerShare !== 10000}
                   className={`w-full py-2 px-4 rounded-md text-white font-medium ${
-                    isResolving || clientShare + freelancerShare !== 100
+                    isResolving || clientShare + freelancerShare !== 10000
                       ? 'bg-gray-400 cursor-not-allowed'
                       : 'bg-green-600 hover:bg-green-700'
                   }`}

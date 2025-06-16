@@ -179,7 +179,11 @@ export const useAdminApi = () => {
       mutationFn: async ({ contractId, clientShare, freelancerShare, adminNote }) => {
         const response = await axios.post(
           `${API_BASE_URL}/admin/disputes/${contractId}/resolve`,
-          { clientShare, freelancerShare, adminNote },
+          { 
+            clientShare, // in basis points (0-10000)
+            freelancerShare, // in basis points (0-10000)
+            adminNote 
+          },
           getRequestConfig('post')
         );
         return response.data;

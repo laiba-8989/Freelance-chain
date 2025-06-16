@@ -3,7 +3,7 @@ const User = require('../models/User');
 const jwt = require('jsonwebtoken');
  
 // Trusted resolver wallet address that can resolve disputes
-const TRUSTED_RESOLVER_ADDRESS = '0x5F1e0C26c5c8866f25308d4240409155A9d20686';
+const TRUSTED_RESOLVER_ADDRESS = '0x3Ff804112919805fFB8968ad81dBb23b32e8F3f1';
  
 // List of admin wallet addresses
 const ADMIN_WALLET_ADDRESSES = [

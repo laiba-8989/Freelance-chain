@@ -665,76 +665,30 @@ const getContract = async (signer) => {
 
 async function resolveDispute(contractId, clientShare, freelancerShare) {
     try {
-        console.log('Resolving dispute for contract:', contractId);
-        console.log('Shares - Client:', clientShare, 'Freelancer:', freelancerShare);
-
-        const signer = await getSigner();
-        if (!signer) {
-            throw new Error('Failed to get signer');
-        }
-
-        // Get contract instance
-        const contract = await getContract(signer);
-        if (!contract) {
-            throw new Error('Failed to get contract instance');
-        }
-
-        // Verify admin status
-        const adminAddress = await contract.admin();
-        const signerAddress = await signer.getAddress();
-        
-        console.log('Admin verification:', {
-            contractAdmin: adminAddress,
-            signerAddress: signerAddress,
-            isAdmin: adminAddress.toLowerCase() === signerAddress.toLowerCase()
-        });
-
-        if (adminAddress.toLowerCase() !== signerAddress.toLowerCase()) {
-            throw new Error('Only admin can resolve disputes');
-        }
-
-        // Convert percentages to basis points (1% = 100 basis points)
-        const clientShareBasisPoints = Math.floor(clientShare * 100);
-        const freelancerShareBasisPoints = Math.floor(freelancerShare * 100);
-
-        console.log('Converting shares to basis points:', {
-            clientShareBasisPoints,
-            freelancerShareBasisPoints
-        });
-
-        // Verify total is 100%
-        if (clientShareBasisPoints + freelancerShareBasisPoints !== 10000) {
-            throw new Error('Shares must total 100%');
-        }
-
-        // Set gas limit manually to avoid estimation issues
-        const gasLimit = 500000;
-
-        console.log('Sending resolve dispute transaction...');
+        const contract = await getContract();
         const tx = await contract.resolveDispute(
             contractId,
-            clientShareBasisPoints,
-            freelancerShareBasisPoints,
-            { gasLimit }
+            clientShare, // in basis points (0-10000)
+            freelancerShare // in basis points (0-10000)
         );
-
-        console.log('Transaction sent:', tx.hash);
         const receipt = await tx.wait();
-        console.log('Transaction confirmed:', receipt);
+        
+        // Get the DisputeResolved event
+        const event = receipt.events.find(e => e.event === "DisputeResolved");
+        if (!event) {
+            throw new Error("DisputeResolved event not found");
+        }
 
         return {
             success: true,
-            transactionHash: receipt.transactionHash,
-            blockNumber: receipt.blockNumber
+            transactionHash: tx.hash,
+            clientAmount: event.args.clientAmount.toString(),
+            freelancerAmount: event.args.freelancerAmount.toString(),
+            resolvedBy: event.args.resolvedBy
         };
     } catch (error) {
-        console.error('Error in resolveDispute:', {
-            message: error.message,
-            code: error.code,
-            data: error.data,
-            reason: error.reason
-        });
-        throw error;
+        console.error("Error resolving dispute:", error);
+        throw new Error(error.message || "Failed to resolve dispute");
     }
 }
 

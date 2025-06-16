@@ -210,21 +210,8 @@ export const contractService = {
 
   rejectWork: async (contractId, data) => {
     try {
-      // First get the contract details to ensure we have the correct ID
-      const contractResponse = await api.get(
-        `/contracts/${contractId}`,
-        getAuthConfig()
-      );
-
-      if (!contractResponse.data.success) {
-        throw new Error('Failed to fetch contract details');
-      }
-
-      const contract = contractResponse.data.data;
-      
-      // Now send the rejection request with the contract's blockchain ID
       const response = await api.post(
-        `/contracts/${contract.contractId}/reject-work`,
+        `/contracts/${contractId}/reject-work`,
         data,
         getAuthConfig()
       );
