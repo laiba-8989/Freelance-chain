@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { useWeb3 } from '../../../context/Web3Context';
 
 const Navbar = () => {
   const [findWorkOpen, setFindWorkOpen] = useState(false);
@@ -7,9 +8,8 @@ const Navbar = () => {
   const [profileOpen, setProfileOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const user = JSON.parse(localStorage.getItem('user'));
-  const isAdmin = localStorage.getItem('isAdmin') === 'true';
-  const adminUser = JSON.parse(localStorage.getItem('adminUser'));
   const navigate = useNavigate();
+  const { disconnectWallet } = useWeb3();
 
   const toggleFindWork = () => {
     setFindWorkOpen(!findWorkOpen);
@@ -30,14 +30,23 @@ const Navbar = () => {
   };
 
   const handleSignOut = () => {
+    // Clear all auth-related data
     localStorage.removeItem('token');
     localStorage.removeItem('user');
     localStorage.removeItem('userId');
+    localStorage.removeItem('authToken');
     localStorage.removeItem('isAdmin');
     localStorage.removeItem('adminUser');
-    localStorage.removeItem('authToken');
+    localStorage.removeItem('verifiedAdmin');
+    localStorage.removeItem('verifiedWallet');
+    localStorage.removeItem('walletConnected');
+    localStorage.removeItem('walletAddress');
+    
+    // Disconnect wallet using Web3Context
+    disconnectWallet();
+    
+    // Navigate to signin page
     navigate('/signin');
-    window.location.reload();
   };
 
   const renderPublicNav = () => (
@@ -196,22 +205,13 @@ const Navbar = () => {
               
               {/* Role-specific navigation */}
               {user ? (
-                !isAdmin ? (
-                  user.role === 'client' ? renderClientNav() : renderFreelancerNav()
-                ) : (
-                  <Link
-                    to="/admin/dashboard"
-                    className="border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium"
-                  >
-                    Admin Dashboard
-                  </Link>
-                )
+                user.role === 'client' ? renderClientNav() : renderFreelancerNav()
               ) : (
                 renderPublicNav()
               )}
 
               {/* Common Links */}
-              {user && !isAdmin && (
+              {user && (
                 <>
                   <Link
                     to="/messages"
@@ -238,7 +238,7 @@ const Navbar = () => {
                   onClick={toggleProfile}
                   className="flex items-center text-sm text-green-900 hover:text-green-800"
                 >
-                  <span>Hello, {isAdmin ? (adminUser?.name || 'Admin') : user.name}</span>
+                  <span>Hello, {user.name}</span>
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
                     className={`h-5 w-5 ml-2 transition-transform ${profileOpen ? "rotate-180" : ""}`}
@@ -255,28 +255,24 @@ const Navbar = () => {
 
                 {profileOpen && (
                   <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg py-2 z-10">
-                    {!isAdmin && (
-                      <>
-                        <Link
-                          to="/profile"
-                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                        >
-                          Profile
-                        </Link>
-                        <Link
-                          to="/settings"
-                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                        >
-                          Settings
-                        </Link>
-                        <Link
-                          to="/settings/notifications"
-                          className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                        >
-                          Notification Settings
-                        </Link>
-                      </>
-                    )}
+                    <Link
+                      to="/profile"
+                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                    >
+                      Profile
+                    </Link>
+                    <Link
+                      to="/settings"
+                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                    >
+                      Settings
+                    </Link>
+                    <Link
+                      to="/settings/notifications"
+                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                    >
+                      Notification Settings
+                    </Link>
                     <button
                       onClick={handleSignOut}
                       className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"

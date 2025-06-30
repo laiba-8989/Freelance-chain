@@ -296,15 +296,278 @@ const markAllAsRead = async (userId) => {
   }
 };
 
-module.exports = {
-  notify,
-  getUserNotifications,
-  markAsRead,
-  markAllAsRead,
-  addOnlineUser,
-  removeOnlineUser,
-  getUserSocketId,
-  getOnlineUsers,
-  getUserNotificationSettings,
-  updateNotificationSettings
-}; 
+class NotificationService {
+    // Store online users and their socket IDs
+    onlineUsers = new Map();
+
+    // Add user to online users
+    addOnlineUser(userId, socketId) {
+        this.onlineUsers.set(userId.toString(), socketId);
+        console.log('User connected:', userId, 'Socket:', socketId);
+        console.log('Online users:', Array.from(this.onlineUsers.entries()));
+    }
+
+    // Remove user from online users
+    removeOnlineUser(userId) {
+        this.onlineUsers.delete(userId.toString());
+        console.log('User disconnected:', userId);
+        console.log('Online users:', Array.from(this.onlineUsers.entries()));
+    }
+
+    // Get user's socket ID
+    getUserSocketId(userId) {
+        return this.onlineUsers.get(userId.toString());
+    }
+
+    // Get all online users
+    getOnlineUsers() {
+        return Array.from(this.onlineUsers.keys());
+    }
+
+    // Create a notification with socket.io support
+    async notify(userId, type, content, link, io, senderId) {
+        try {
+            // Check user's notification settings
+            const settings = await NotificationSettings.findOne({ userId });
+            if (settings && !settings.isNotificationEnabled('pushNotifications', type)) {
+                return null; // User has disabled this type of notification
+            }
+
+            const notification = new Notification({
+                userId,
+                senderId,
+                type,
+                content,
+                link,
+                isAdmin: false
+            });
+
+            await notification.save();
+
+            // Emit real-time notification if socket.io is available
+            if (io) {
+                const socketId = this.getUserSocketId(userId);
+                if (socketId) {
+                    io.to(socketId).emit('notification', {
+                        type,
+                        content,
+                        link,
+                        senderId,
+                        createdAt: notification.createdAt
+                    });
+                }
+            }
+
+            return notification;
+        } catch (error) {
+            console.error('Error creating notification:', error);
+            throw error;
+        }
+    }
+
+    // Create a notification (original method)
+    async createNotification({
+        userId,
+        senderId,
+        type,
+        content,
+        link,
+        isAdmin = false
+    }) {
+        try {
+            // If userId is provided, check user's notification settings
+            if (userId) {
+                const settings = await NotificationSettings.findOne({ userId });
+                if (settings && !settings.isNotificationEnabled('pushNotifications', type)) {
+                    return null; // User has disabled this type of notification
+                }
+            }
+
+            const notification = new Notification({
+                userId,
+                senderId,
+                type,
+                content,
+                link,
+                isAdmin
+            });
+
+            await notification.save();
+            return notification;
+        } catch (error) {
+            console.error('Error creating notification:', error);
+            throw error;
+        }
+    }
+
+    // Get user notifications with pagination
+    async getUserNotifications(userId, page = 1, limit = 10) {
+        try {
+            const skip = (page - 1) * limit;
+            
+            const [notifications, total] = await Promise.all([
+                Notification.find({ 
+                    $or: [
+                        { userId },
+                        { isAdmin: true }
+                    ]
+                })
+                .sort({ createdAt: -1 })
+                .skip(skip)
+                .limit(limit)
+                .populate('senderId', 'name profileImage'),
+                Notification.countDocuments({ 
+                    $or: [
+                        { userId },
+                        { isAdmin: true }
+                    ]
+                })
+            ]);
+
+            return {
+                notifications,
+                total,
+                page,
+                totalPages: Math.ceil(total / limit)
+            };
+        } catch (error) {
+            console.error('Error getting user notifications:', error);
+            throw error;
+        }
+    }
+
+    // Mark notification as read
+    async markAsRead(notificationId, userId) {
+        try {
+            const notification = await Notification.findOne({
+                _id: notificationId,
+                userId
+            });
+
+            if (!notification) return null;
+
+            notification.isRead = true;
+            await notification.save();
+            return notification;
+        } catch (error) {
+            console.error('Error marking notification as read:', error);
+            throw error;
+        }
+    }
+
+    // Mark all notifications as read for a user
+    async markAllAsRead(userId) {
+        try {
+            const result = await Notification.updateMany(
+                { userId, isRead: false },
+                { $set: { isRead: true } }
+            );
+            return result;
+        } catch (error) {
+            console.error('Error marking all notifications as read:', error);
+            throw error;
+        }
+    }
+
+    // Get user notification settings
+    async getUserNotificationSettings(userId) {
+        try {
+            let settings = await NotificationSettings.findOne({ userId });
+            
+            if (!settings) {
+                settings = new NotificationSettings({ userId });
+                await settings.save();
+            }
+            
+            return settings;
+        } catch (error) {
+            console.error('Error getting notification settings:', error);
+            throw error;
+        }
+    }
+
+    // Update user notification settings
+    async updateNotificationSettings(userId, settings) {
+        try {
+            const updatedSettings = await NotificationSettings.findOneAndUpdate(
+                { userId },
+                { $set: settings },
+                { new: true, upsert: true }
+            );
+            return updatedSettings;
+        } catch (error) {
+            console.error('Error updating notification settings:', error);
+            throw error;
+        }
+    }
+
+    // Helper method to notify about work submission
+    async notifyWorkSubmitted(contract, workHash) {
+        return this.notify(
+            contract.client,
+            'work_submitted',
+            `Work has been submitted for contract "${contract.jobTitle}"`,
+            `/contracts/${contract._id}`,
+            null,
+            contract.freelancer
+        );
+    }
+
+    // Helper method to notify about new bid
+    async notifyNewBid(job, bid) {
+        return this.notify(
+            job.clientId,
+            'bid',
+            `New bid received for "${job.title}"`,
+            `/jobs/${job._id}/bids`,
+            null,
+            bid.freelancerId
+        );
+    }
+
+    // Helper method to notify about proposal acceptance
+    async notifyProposalAccepted(proposal) {
+        return this.notify(
+            proposal.freelancerId,
+            'job_hired',
+            `Your proposal for "${proposal.jobId.title}" has been accepted`,
+            `/proposals/${proposal._id}`,
+            null,
+            proposal.jobId.clientId
+        );
+    }
+
+    // Helper method to notify about contract signing
+    async notifyContractSigned(contract, signerType) {
+        const recipientId = signerType === 'client' ? contract.freelancer : contract.client;
+        const senderId = signerType === 'client' ? contract.client : contract.freelancer;
+        
+        return this.notify(
+            recipientId,
+            'contract_created',
+            `Contract "${contract.jobTitle}" has been signed by the ${signerType}`,
+            `/contracts/${contract._id}`,
+            null,
+            senderId
+        );
+    }
+
+    // Helper method to notify about payment
+    async notifyPayment(payment, type) {
+        const recipientId = type === 'release' ? payment.freelancerId : payment.clientId;
+        const senderId = type === 'release' ? payment.clientId : payment.freelancerId;
+        
+        return this.notify(
+            recipientId,
+            type === 'release' ? 'payment_released' : 'payment_requested',
+            type === 'release' 
+                ? `Payment has been released for contract #${payment.contractId}`
+                : `Payment has been requested for contract #${payment.contractId}`,
+            `/payments/${payment._id}`,
+            null,
+            senderId
+        );
+    }
+}
+
+module.exports = new NotificationService(); 

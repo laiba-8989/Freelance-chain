@@ -301,7 +301,8 @@ const JobDetail = () => {
                   View Profile
                 </Link>
                 <Link 
-                  to={`/messages/new?userId=${job.clientId}&jobId=${job._id}`}
+                  to="/messages/new"
+                  state={{ recipientId: job.clientId, jobId: job._id }}
                   className="w-full py-2 px-4 bg-white border border-[#6D9773] text-[#6D9773] hover:bg-gray-50 rounded-lg font-medium transition-all flex items-center justify-center"
                 >
                   <svg className="mr-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">

@@ -1,17 +1,43 @@
 const { ethers } = require('ethers');
 const User = require('../models/User');
 const jwt = require('jsonwebtoken');
+const { trusted } = require('mongoose');
  
 // Trusted resolver wallet address that can resolve disputes
 const TRUSTED_RESOLVER_ADDRESS = '0x3Ff804112919805fFB8968ad81dBb23b32e8F3f1';
  
-// List of admin wallet addresses
+// List of admin wallet addresses with names
 const ADMIN_WALLET_ADDRESSES = [
-    TRUSTED_RESOLVER_ADDRESS,
-    '0x126eecbce83e22da5f46dc2be670994db2cd2a8d',
-    '0x3Ff804112919805fFB8968ad81dBb23b32e8F3f1'
+  {
+      address: TRUSTED_RESOLVER_ADDRESS,
+      name: 'Trusted Resolver'
+  },
+  {
+      address: '0x5F1e0C26c5c8866f25308d4240409155A9d20686',
+      name: 'Admin 1'
+  },
+  {
+      address: '0x126eecbce83e22da5f46dc2be670994db2cd2a8d',
+        name: 'Admin 2'
+    },
+    {
+        address: '0x3Ff804112919805fFB8968ad81dBb23b32e8F3f1',
+        name: 'Admin 2'
+    },
+    {
+        address: '0x1a16d8976a56F7EFcF2C8f861C055badA335fBdc',
+        name: 'Admin 2'
+    }
 ];
- 
+
+// Helper function to get admin name by wallet address
+const getAdminNameByWallet = (walletAddress) => {
+    const admin = ADMIN_WALLET_ADDRESSES.find(admin => 
+        admin.address.toLowerCase() === walletAddress.toLowerCase()
+    );
+    return admin ? admin.name : 'Unknown Admin';
+};
+
 const validateAdminWallet = async (req, res, next) => {
   try {
     // First validate the JWT token
@@ -76,11 +102,7 @@ const validateAdminWallet = async (req, res, next) => {
     const adminWalletAddress = user.walletAddress?.toLowerCase();
     const requestWalletAddress = req.header('x-admin-wallet')?.toLowerCase();
 
-    console.log('Wallet verification:', {
-      adminWalletAddress,
-      requestWalletAddress,
-      isTrustedAdmin: ADMIN_WALLET_ADDRESSES.some(addr => addr.toLowerCase() === requestWalletAddress)
-    });
+
 
     if (!requestWalletAddress) {
       return res.status(401).json({
@@ -98,7 +120,7 @@ const validateAdminWallet = async (req, res, next) => {
 
     // Check if the wallet address is in the trusted admin list
     const isTrustedAdmin = ADMIN_WALLET_ADDRESSES.some(
-      addr => addr.toLowerCase() === requestWalletAddress
+      admin => admin.address.toLowerCase() === requestWalletAddress
     );
 
     if (!isTrustedAdmin) {
@@ -133,5 +155,6 @@ const validateAdminWallet = async (req, res, next) => {
 module.exports = {
   validateAdminWallet,
   TRUSTED_RESOLVER_ADDRESS,
-  ADMIN_WALLET_ADDRESSES
+  ADMIN_WALLET_ADDRESSES,
+  getAdminNameByWallet
 };

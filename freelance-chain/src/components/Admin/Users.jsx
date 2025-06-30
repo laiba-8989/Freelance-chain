@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import axios from 'axios';
 import { toast } from 'react-hot-toast';
 import { useWeb3 } from '../../context/Web3Context';
+import { useAdminApi } from '../../hooks/useAdminApi';
 
 const Users = () => {
   const [page, setPage] = useState(1);
@@ -10,66 +10,29 @@ const Users = () => {
   const [roleFilter, setRoleFilter] = useState('all');
   const queryClient = useQueryClient();
   const { account } = useWeb3();
+  const { useUsers, useUpdateUserStatus } = useAdminApi();
 
-  const { data, isLoading, error } = useQuery({
-    queryKey: ['adminUsers', page, statusFilter, roleFilter],
-    queryFn: async () => {
-      const token = localStorage.getItem('authToken');
-      if (!token || !account) {
-        throw new Error('Authentication required');
-      }
-
-      const response = await axios.get(`http://localhost:5000/api/admin/users`, {
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        params: {
-          page,
-          limit: 10,
-          status: statusFilter !== 'all' ? statusFilter : undefined,
-          role: roleFilter !== 'all' ? roleFilter : undefined,
-          walletAddress: account
-        }
-      });
-      return response.data.data;
-    }
+  const { data, isLoading, error } = useUsers(page, {
+    status: statusFilter !== 'all' ? statusFilter : undefined,
+    role: roleFilter !== 'all' ? roleFilter : undefined
   });
 
-  const updateStatusMutation = useMutation({
-    mutationFn: async ({ userId, status }) => {
-      const token = localStorage.getItem('authToken');
-      if (!token || !account) {
-        throw new Error('Authentication required');
-      }
-
-      const response = await axios.patch(
-        `http://localhost:5000/api/admin/users/${userId}/status`,
-        { status },
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          params: {
-            walletAddress: account
-          }
-        }
-      );
-      return response.data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries(['adminUsers']);
-      toast.success('User status updated successfully');
-    },
-    onError: (error) => {
-      toast.error(error.response?.data?.message || 'Failed to update user status');
-    }
-  });
+  const updateStatusMutation = useUpdateUserStatus();
 
   const handleStatusChange = (userId, newStatus) => {
     updateStatusMutation.mutate({ userId, status: newStatus });
   };
+
+  if (!account) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <h2 className="text-xl font-semibold text-gray-700">Please connect your wallet</h2>
+          <p className="mt-2 text-gray-500">You need to connect your wallet to access the admin panel</p>
+        </div>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (
@@ -87,7 +50,10 @@ const Users = () => {
   if (error) {
     return (
       <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-        <p className="text-red-600">Error loading users</p>
+        <p className="text-red-600">Error loading users: {error.message}</p>
+        <p className="text-sm text-red-500 mt-2">
+          Please ensure you are logged in and have admin privileges
+        </p>
       </div>
     );
   }
@@ -105,7 +71,7 @@ const Users = () => {
             <option value="all">All Status</option>
             <option value="active">Active</option>
             <option value="inactive">Inactive</option>
-            <option value="banned">Banned</option>
+            <option value="suspended">Suspended</option>
           </select>
           <select
             value={roleFilter}
@@ -113,8 +79,10 @@ const Users = () => {
             className="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
           >
             <option value="all">All Roles</option>
-            <option value="client">Client</option>
+            <option value="user">User</option>
             <option value="freelancer">Freelancer</option>
+            <option value="client">Client</option>
+            <option value="admin">Admin</option>
           </select>
         </div>
       </div>
@@ -124,7 +92,10 @@ const Users = () => {
           <thead className="bg-gray-50">
             <tr>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                User
+                User Details
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Wallet Address
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Role
@@ -133,34 +104,37 @@ const Users = () => {
                 Status
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Wallet Address
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Actions
               </th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {data?.users.map((user) => (
+            {data?.users?.map((user) => (
               <tr key={user._id}>
-                <td className="px-6 py-4 whitespace-nowrap">
+                <td className="px-6 py-4">
                   <div className="flex items-center">
                     <div className="flex-shrink-0 h-10 w-10">
                       <img
-                        className="h-10 w-10 rounded-full"
-                        src={user.profileImage || 'https://via.placeholder.com/40'}
-                        alt=""
+                        src={user.profileImage || 'https://ui-avatars.com/api/?name=User&background=random'}
+                        alt={user.name || 'User'}
+                        className="w-10 h-10 rounded-full object-cover"
                       />
                     </div>
                     <div className="ml-4">
-                      <div className="text-sm font-medium text-gray-900">{user.name}</div>
-                      <div className="text-sm text-gray-500">{user.email}</div>
+                      <div className="text-sm font-medium text-gray-900">{user.name || 'Unknown'}</div>
+                      <div className="text-sm text-gray-500">{user.email || 'No email'}</div>
                     </div>
                   </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
+                  <div className="text-sm text-gray-900">{user.walletAddress || 'No wallet address'}</div>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
                   <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                    user.role === 'client' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'
+                    user.role === 'admin' ? 'bg-purple-100 text-purple-800' :
+                    user.role === 'client' ? 'bg-blue-100 text-blue-800' :
+                    user.role === 'freelancer' ? 'bg-green-100 text-green-800' :
+                    'bg-gray-100 text-gray-800'
                   }`}>
                     {user.role}
                   </span>
@@ -168,14 +142,11 @@ const Users = () => {
                 <td className="px-6 py-4 whitespace-nowrap">
                   <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
                     user.status === 'active' ? 'bg-green-100 text-green-800' :
-                    user.status === 'inactive' ? 'bg-yellow-100 text-yellow-800' :
+                    user.status === 'inactive' ? 'bg-gray-100 text-gray-800' :
                     'bg-red-100 text-red-800'
                   }`}>
                     {user.status}
                   </span>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {user.walletAddress}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                   <select
@@ -185,7 +156,7 @@ const Users = () => {
                   >
                     <option value="active">Active</option>
                     <option value="inactive">Inactive</option>
-                    <option value="banned">Banned</option>
+                    <option value="suspended">Suspended</option>
                   </select>
                 </td>
               </tr>
@@ -197,7 +168,7 @@ const Users = () => {
       {/* Pagination */}
       <div className="flex justify-between items-center mt-4">
         <div className="text-sm text-gray-700">
-          Showing {((page - 1) * 10) + 1} to {Math.min(page * 10, data?.total)} of {data?.total} results
+          Showing {((page - 1) * 10) + 1} to {Math.min(page * 10, data?.total || 0)} of {data?.total || 0} results
         </div>
         <div className="flex space-x-2">
           <button
@@ -209,7 +180,7 @@ const Users = () => {
           </button>
           <button
             onClick={() => setPage(p => p + 1)}
-            disabled={page * 10 >= data?.total}
+            disabled={page * 10 >= (data?.total || 0)}
             className="px-3 py-1 rounded-md border border-gray-300 disabled:opacity-50"
           >
             Next
@@ -220,4 +191,4 @@ const Users = () => {
   );
 };
 
-export default Users; 
+export default Users;

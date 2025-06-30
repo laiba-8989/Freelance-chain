@@ -26,10 +26,8 @@ const ContractDetails = () => {
           {
             headers: {
               'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json'
-            },
-            params: {
-              walletAddress: account
+              'Content-Type': 'application/json',
+              'x-admin-wallet': account.toLowerCase()
             }
           }
         );
@@ -50,8 +48,8 @@ const ContractDetails = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-green-600"></div>
+      <div className="flex items-center justify-center min-h-[calc(100vh-64px)]">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#6D9773]"></div>
       </div>
     );
   }
@@ -61,6 +59,12 @@ const ContractDetails = () => {
       <div className="text-center py-12">
         <h2 className="text-2xl font-bold text-red-600">Error</h2>
         <p className="mt-2 text-gray-600">{error}</p>
+        <button
+          onClick={() => navigate('/admin/contracts')}
+          className="mt-4 px-4 py-2 bg-[#0C3B2E] text-white rounded-md hover:bg-[#6D9773] transition-colors"
+        >
+          Back to Contracts
+        </button>
       </div>
     );
   }
@@ -69,6 +73,12 @@ const ContractDetails = () => {
     return (
       <div className="text-center py-12">
         <h2 className="text-2xl font-bold text-gray-600">Contract Not Found</h2>
+        <button
+          onClick={() => navigate('/admin/contracts')}
+          className="mt-4 px-4 py-2 bg-[#0C3B2E] text-white rounded-md hover:bg-[#6D9773] transition-colors"
+        >
+          Back to Contracts
+        </button>
       </div>
     );
   }
@@ -78,79 +88,55 @@ const ContractDetails = () => {
       <div className="mb-6">
         <button
           onClick={() => navigate('/admin/contracts')}
-          className="text-green-600 hover:text-green-900"
+          className="flex items-center text-[#0C3B2E] hover:text-[#BB8A52] transition-colors"
         >
-          ← Back to Contracts
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clipRule="evenodd" />
+          </svg>
+          Back to Contracts
         </button>
       </div>
 
       <div className="bg-white shadow overflow-hidden sm:rounded-lg">
-        <div className="px-4 py-5 sm:px-6">
-          <h3 className="text-lg leading-6 font-medium text-gray-900">
+        <div className="px-4 py-5 sm:px-6 bg-[#0C3B2E]">
+          <h3 className="text-lg leading-6 font-medium text-white">
             Contract Details
           </h3>
-          <p className="mt-1 max-w-2xl text-sm text-gray-500">
+          <p className="mt-1 max-w-2xl text-sm text-gray-200">
             Contract ID: {contract.contractId}
           </p>
         </div>
         <div className="border-t border-gray-200">
           <dl>
-            <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-              <dt className="text-sm font-medium text-gray-500">Status</dt>
-              <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                <span className={`inline-flex rounded-full px-2 text-xs font-semibold leading-5 ${
-                  contract.status === 'disputed' 
-                    ? 'bg-red-100 text-red-800'
-                    : contract.status === 'completed'
-                    ? 'bg-green-100 text-green-800'
-                    : 'bg-gray-100 text-gray-800'
-                }`}>
-                  {contract.status}
-                </span>
-              </dd>
-            </div>
-            <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-              <dt className="text-sm font-medium text-gray-500">Client</dt>
-              <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                {contract.client?.name || 'Unknown'} ({contract.client?.walletAddress})
-              </dd>
-            </div>
-            <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-              <dt className="text-sm font-medium text-gray-500">Freelancer</dt>
-              <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                {contract.freelancer?.name || 'Unknown'} ({contract.freelancer?.walletAddress})
-              </dd>
-            </div>
-            <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-              <dt className="text-sm font-medium text-gray-500">Amount</dt>
-              <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                {contract.bidAmount} VG
-              </dd>
-            </div>
-            <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-              <dt className="text-sm font-medium text-gray-500">Job Title</dt>
-              <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                {contract.job?.title || 'N/A'}
-              </dd>
-            </div>
-            <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-              <dt className="text-sm font-medium text-gray-500">Job Description</dt>
-              <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                {contract.job?.description || 'N/A'}
-              </dd>
-            </div>
-            <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-              <dt className="text-sm font-medium text-gray-500">Created At</dt>
-              <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                {new Date(contract.createdAt).toLocaleString()}
-              </dd>
-            </div>
-            <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-              <dt className="text-sm font-medium text-gray-500">Last Updated</dt>
-              <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                {new Date(contract.updatedAt).toLocaleString()}
-              </dd>
-            </div>
+            {[
+              { label: 'Status', value: contract.status, highlight: true },
+              { label: 'Client', value: `${contract.client?.name || 'Unknown'} (${contract.client?.walletAddress})` },
+              { label: 'Freelancer', value: `${contract.freelancer?.name || 'Unknown'} (${contract.freelancer?.walletAddress})` },
+              { label: 'Amount', value: `${contract.bidAmount} VG` },
+              { label: 'Job Title', value: contract.job?.title || 'N/A' },
+              { label: 'Job Description', value: contract.job?.description || 'N/A' },
+              { label: 'Created At', value: new Date(contract.createdAt).toLocaleString() },
+              { label: 'Last Updated', value: new Date(contract.updatedAt).toLocaleString() },
+            ].map((item, index) => (
+              <div key={index} className={`px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6 ${index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}`}>
+                <dt className="text-sm font-medium text-gray-500">{item.label}</dt>
+                <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
+                  {item.highlight ? (
+                    <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold leading-4 ${
+                      contract.status === 'disputed' 
+                        ? 'bg-red-100 text-red-800'
+                        : contract.status === 'completed'
+                        ? 'bg-green-100 text-green-800'
+                        : 'bg-gray-100 text-gray-800'
+                    }`}>
+                      {contract.status}
+                    </span>
+                  ) : (
+                    item.value
+                  )}
+                </dd>
+              </div>
+            ))}
           </dl>
         </div>
       </div>
@@ -158,4 +144,4 @@ const ContractDetails = () => {
   );
 };
 
-export default ContractDetails; 
+export default ContractDetails;

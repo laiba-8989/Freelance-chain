@@ -1,47 +1,17 @@
 const express = require('express');
 const router = express.Router();
-const { validateAdminWallet, ADMIN_WALLET_ADDRESSES } = require('../middleware/adminAuth');
+const { validateAdminWallet, ADMIN_WALLET_ADDRESSES, getAdminNameByWallet } = require('../middleware/adminAuth');
 const adminController = require('../controllers/adminController');
 const User = require('../models/User');
 const jwt = require('jsonwebtoken');
+const auth = require('../middleware/auth');
 
 // Admin verification endpoint
-router.get('/verify', async (req, res) => {
-  console.log('Admin verification request received:', {
-    headers: req.headers,
-    query: req.query
-  });
-
+router.get('/verify', auth, async (req, res) => {
   try {
-    const token = req.header('Authorization')?.replace('Bearer ', '');
-    if (!token) {
-      console.log('No token provided in request');
-      return res.status(401).json({
-        success: false,
-        isAdmin: false,
-        message: 'No authentication token provided'
-      });
-    }
-
-    // Verify token
-    let decoded;
-    try {
-      decoded = jwt.verify(token, process.env.JWT_SECRET);
-      console.log('Token decoded:', decoded);
-    } catch (jwtError) {
-      console.error('JWT verification failed:', jwtError);
-      return res.status(401).json({
-        success: false,
-        isAdmin: false,
-        message: 'Invalid authentication token'
-      });
-    }
-
     const walletAddress = req.query.walletAddress?.toLowerCase();
-    const headerWalletAddress = req.header('x-admin-wallet')?.toLowerCase();
 
-    if (!walletAddress || !headerWalletAddress) {
-      console.log('No wallet address provided in query or header');
+    if (!walletAddress) {
       return res.status(400).json({
         success: false,
         isAdmin: false,
@@ -49,17 +19,12 @@ router.get('/verify', async (req, res) => {
       });
     }
 
-    if (walletAddress !== headerWalletAddress) {
-      console.log('Wallet address mismatch:', { query: walletAddress, header: headerWalletAddress });
-      return res.status(400).json({
-        success: false,
-        isAdmin: false,
-        message: 'Wallet address mismatch'
-      });
-    }
-
     // Check if wallet address is in trusted admin list
-    if (!ADMIN_WALLET_ADDRESSES.map(addr => addr.toLowerCase()).includes(walletAddress)) {
+    const isAdminWallet = ADMIN_WALLET_ADDRESSES.some(admin => 
+      admin.address.toLowerCase() === walletAddress
+    );
+
+    if (!isAdminWallet) {
       console.log('Wallet address not in trusted admin list:', walletAddress);
       return res.status(403).json({
         success: false,
@@ -90,6 +55,8 @@ router.get('/verify', async (req, res) => {
       });
     }
 
+    const adminName = getAdminNameByWallet(walletAddress);
+
     const response = {
       success: true,
       isAdmin: true,
@@ -98,7 +65,7 @@ router.get('/verify', async (req, res) => {
         _id: user._id,
         walletAddress: user.walletAddress,
         role: user.role,
-        name: user.name
+        name: adminName || user.name
       }
     };
 

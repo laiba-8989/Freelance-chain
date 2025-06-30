@@ -121,6 +121,22 @@ export const Web3Provider = ({ children }) => {
     localStorage.removeItem('walletConnected');
     localStorage.removeItem('walletAddress');
     
+    // Clear all auth-related data
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    localStorage.removeItem('userId');
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('isAdmin');
+    localStorage.removeItem('adminUser');
+    localStorage.removeItem('verifiedAdmin');
+    localStorage.removeItem('verifiedWallet');
+    
+    // Remove all event listeners
+    if (window.ethereum) {
+      window.ethereum.removeAllListeners('accountsChanged');
+      window.ethereum.removeAllListeners('chainChanged');
+    }
+    
     // If auth context is available and user is logged in, log them out
     if (auth?.user) {
       auth.logout();

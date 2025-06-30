@@ -1,38 +1,25 @@
-// import { Outlet } from 'react-router-dom';
-// import Navbar from '../components/Freelancer/Cards/Navbar';
-// import Footer from '../components/Freelancer/Cards/footer';
-
-// const Layout = () => {
-//   return (
-//     <div className="app-container">
-//       <Navbar />
-//       <main className="main-content">
-//         <Outlet /> {/* This renders the matched child route */}
-//       </main>
-//       <Footer />
-//     </div>
-//   );
-// };
-
-// export default Layout;
 import { Outlet, useLocation } from 'react-router-dom';
 import Navbar from '../components/Freelancer/Cards/Navbar';
 import Footer from '../components/Freelancer/Cards/footer';
+import { useEffect, useState } from 'react';
 
 const Layout = () => {
   const location = useLocation();
+  const [isAdmin, setIsAdmin] = useState(false);
 
- 
+  useEffect(() => {
+    const adminStatus = localStorage.getItem('isAdmin') === 'true';
+    setIsAdmin(adminStatus);
+  }, []);
 
-  // List of routes where the footer should be hidden
-  const hideFooterRoutes = ['/messages'];
-  const shouldHideFooter = hideFooterRoutes.includes(location.pathname);
+  // Check if the current path starts with any of the routes where footer should be hidden
+  const shouldHideFooter = location.pathname.startsWith('/messages');
 
   return (
-    <div className="app-container">
+    <div className="app-container min-h-screen flex flex-col">
       <Navbar />
-      <main className="main-content">
-        <Outlet /> {/* This renders the matched child route */}
+      <main className={`main-content flex-grow ${isAdmin ? 'pt-0' : ''}`}>
+        <Outlet />
       </main>
       {!shouldHideFooter && <Footer />}
     </div>

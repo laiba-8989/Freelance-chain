@@ -17,6 +17,7 @@ const ethers = require('ethers');
 const { CONTRACT_ABI } = require('../config/contractABI');
 const { contract } = require('../config/web3');
 const { JobContractAddress } = require('../utils/contractUtils');
+const { getAdminNameByWallet } = require('../middleware/adminAuth');
 
 const adminController = {
   // Dashboard stats
@@ -70,12 +71,23 @@ const adminController = {
         .limit(parseInt(limit))
         .sort({ createdAt: -1 });
 
+      // Add admin names for admin users
+      const usersWithAdminNames = users.map(user => {
+        if (user.role === 'admin') {
+          return {
+            ...user.toObject(),
+            name: getAdminNameByWallet(user.walletAddress) || user.name
+          };
+        }
+        return user;
+      });
+
       const total = await User.countDocuments(query);
 
       res.json({
         success: true,
         data: {
-          users,
+          users: usersWithAdminNames,
           total,
           pages: Math.ceil(total / limit),
           currentPage: parseInt(page)
@@ -186,20 +198,49 @@ const adminController = {
       if (status) query.status = status;
       if (blockchainContractId) query.contractId = blockchainContractId;
 
+      // First get total count for pagination
+      const total = await Contract.countDocuments(query);
+
+      // Then get contracts with populated fields
       const contracts = await Contract.find(query)
-        .populate('client', 'name walletAddress')
-        .populate('freelancer', 'name walletAddress')
-        .populate('job', 'title description')
+        .populate({
+          path: 'client',
+          select: 'name walletAddress',
+          options: { lean: true }
+        })
+        .populate({
+          path: 'freelancer',
+          select: 'name walletAddress',
+          options: { lean: true }
+        })
+        .populate({
+          path: 'job',
+          select: 'title description',
+          options: { lean: true }
+        })
+        .populate({
+          path: 'bid',
+          select: 'amount description',
+          options: { lean: true }
+        })
         .skip((page - 1) * limit)
         .limit(parseInt(limit))
-        .sort({ createdAt: -1 });
+        .sort({ createdAt: -1 })
+        .lean();
 
-      const total = await Contract.countDocuments(query);
+      // Handle null references
+      const sanitizedContracts = contracts.map(contract => ({
+        ...contract,
+        client: contract.client || { name: 'Unknown', walletAddress: 'Unknown' },
+        freelancer: contract.freelancer || { name: 'Unknown', walletAddress: 'Unknown' },
+        job: contract.job || { title: 'Unknown', description: 'Unknown' },
+        bid: contract.bid || { amount: 0, description: 'Unknown' }
+      }));
 
       res.json({
         success: true,
         data: {
-          contracts,
+          contracts: sanitizedContracts,
           total,
           pages: Math.ceil(total / limit),
           currentPage: parseInt(page)
@@ -209,7 +250,8 @@ const adminController = {
       console.error('Error getting contracts:', error);
       res.status(500).json({ 
         success: false, 
-        message: 'Error fetching contracts' 
+        message: 'Error fetching contracts',
+        error: error.message 
       });
     }
   },

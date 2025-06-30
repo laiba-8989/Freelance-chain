@@ -336,33 +336,60 @@ exports.signContract = async (req, res) => {
         // Map blockchain status to DB status
         const dbStatus = blockchainToDbStatus[blockchainState.status];
 
-        // Determine signed/approved states from the *processed* blockchainState (derived from status in contractUtils)
+        // Determine signed/approved states from the *processed* blockchainState
         const isClientSigned = blockchainState.clientApproved;
         const isFreelancerSigned = blockchainState.freelancerApproved;
 
-        // ✅ Always explicitly update with $set
+        // Update contract in database
         await Contract.findByIdAndUpdate(contract._id, {
             $set: {
-                status: dbStatus, // Update status based on blockchain
+                status: dbStatus,
                 clientSigned: isClientSigned,
                 freelancerSigned: isFreelancerSigned,
-                clientApproved: isClientSigned, // Sync approved with signed based on this flow
-                freelancerApproved: isFreelancerSigned, // Sync approved with signed based on this flow
+                clientApproved: isClientSigned,
+                freelancerApproved: isFreelancerSigned,
                 updatedAt: new Date()
             }
         });
 
-        // ✅ Post-save check
+        // Create notification for the other party
+        const signerType = req.user._id.toString() === contract.client.toString() ? 'client' : 'freelancer';
+        await notificationService.notify(
+            signerType === 'client' ? contract.freelancer : contract.client,
+            'contract_signed',
+            `Contract "${contract.jobTitle}" has been signed by the ${signerType}`,
+            `/contracts/${contract._id}`,
+            req.app.get('io'),
+            req.user._id
+        );
+
+        // If both parties have signed, send contract accepted notification to both parties
+        if (dbStatus === 'both_signed') {
+            // Notify client
+            await notificationService.notify(
+                contract.client,
+                'contract_accepted',
+                `Contract "${contract.jobTitle}" has been accepted by both parties`,
+                `/contracts/${contract._id}`,
+                req.app.get('io'),
+                contract.freelancer
+            );
+
+            // Notify freelancer
+            await notificationService.notify(
+                contract.freelancer,
+                'contract_accepted',
+                `Contract "${contract.jobTitle}" has been accepted by both parties`,
+                `/contracts/${contract._id}`,
+                req.app.get('io'),
+                contract.client
+            );
+        }
+
+        // Post-save check
         const updated = await Contract.findById(contract._id).lean();
         console.log('Post-save verification:', {
             contractId: contractId,
-            clientSigned: updated.clientSigned,
-            freelancerSigned: updated.freelancerSigned
-        });
-
-        console.log('Database contract updated:', {
-            contractId: contract.contractId,
-            status: updated.status, // Use status from the updated document
             clientSigned: updated.clientSigned,
             freelancerSigned: updated.freelancerSigned
         });
@@ -376,18 +403,6 @@ exports.signContract = async (req, res) => {
             clientSigned: isClientSigned,
             freelancerSigned: isFreelancerSigned
         };
-
-        console.log('Final contract data:', {
-            contractId: contract.contractId,
-            status: updatedContractData.status,
-            clientApproved: updatedContractData.clientApproved,
-            freelancerApproved: updatedContractData.freelancerApproved,
-            blockchainState: {
-                status: updatedContractData.blockchainState.status,
-                clientApproved: updatedContractData.blockchainState.clientApproved,
-                freelancerApproved: updatedContractData.blockchainState.freelancerApproved
-            }
-        });
 
         res.status(200).json({
             success: true,
@@ -489,6 +504,16 @@ exports.approveWork = async (req, res) => {
         contract.status = 'work_approved';
         await contract.save();
 
+        // Create notification for the freelancer
+        await notificationService.notify(
+            contract.freelancer,
+            'work_approved',
+            `Your work for "${contract.jobTitle}" has been approved`,
+            `/contracts/${contract._id}`,
+            req.app.get('io'),
+            req.user._id
+        );
+
         res.status(200).json({
             success: true,
             message: 'Work approved successfully',
@@ -519,6 +544,13 @@ exports.releasePayment = async (req, res) => {
         
         contract.status = 'completed';
         await contract.save();
+
+        // Create notification for payment release
+        await notificationService.notifyPayment({
+            contractId: contract._id,
+            freelancerId: contract.freelancer,
+            clientId: contract.client
+        }, 'release');
 
         res.status(200).json({
             success: true,
@@ -576,6 +608,16 @@ exports.rejectWork = async (req, res) => {
         contract.transactionHash = transactionHash;
         contract.disputeTransactionHash = disputeTransactionHash;
         await contract.save();
+
+        // Create notification for freelancer about work rejection
+        await notificationService.notify(
+            contract.freelancer,
+            'work_rejected',
+            `Your work for "${contract.jobTitle}" has been rejected. Reason: ${rejectionReason}`,
+            `/contracts/${contract._id}`,
+            req.app.get('io'),
+            req.user._id
+        );
 
         // Create notification for admin
         await notificationService.createNotification({

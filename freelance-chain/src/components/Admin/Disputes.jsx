@@ -209,7 +209,7 @@ const Disputes = () => {
 
   if (!account) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div className="flex items-center justify-center min-h-[calc(100vh-64px)]">
         <div className="text-center">
           <h2 className="text-xl font-semibold text-gray-600">Please connect your wallet</h2>
         </div>
@@ -237,11 +237,8 @@ const Disputes = () => {
 
   if (isLoadingDisputes) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-green-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading disputes...</p>
-        </div>
+      <div className="flex items-center justify-center min-h-[calc(100vh-64px)]">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#6D9773]"></div>
       </div>
     );
   }
@@ -293,7 +290,7 @@ const Disputes = () => {
                   </div>
                   <div className="mt-2 pt-2 border-t border-gray-100">
                     <p className="text-sm text-gray-600">
-                      <span className="font-semibold">Amount:</span> {dispute.amount} ETH
+                      <span className="font-semibold">Amount:</span> {dispute.amount} VG
                     </p>
                     <p className="text-sm text-gray-600">
                       <span className="font-semibold">Reason:</span> {dispute.rejectionReason || 'No reason provided'}
@@ -335,7 +332,7 @@ const Disputes = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm font-semibold text-gray-600">Amount</p>
-                  <p>{selectedDispute.amount} ETH</p>
+                  <p>{selectedDispute.amount} VG</p>
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-gray-600">Deadline</p>
@@ -468,4 +465,4 @@ const Disputes = () => {
   );
 };
 
-export default Disputes; 
+export default Disputes;

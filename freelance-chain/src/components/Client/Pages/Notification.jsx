@@ -137,7 +137,14 @@ const NotificationPage = () => {
             {sortedNotifications.map((notification) => (
               <Link
                 key={notification._id}
-                to={notification.link}
+                to={notification.type === 'message' ? {
+                  pathname: "/messages/new",
+                  state: {
+                    recipientId: notification.senderId._id,
+                    ...(notification.projectId && { projectId: notification.projectId }),
+                    ...(notification.jobId && { jobId: notification.jobId })
+                  }
+                } : notification.link}
                 onClick={() => handleNotificationClick(notification)}
                 className={`block p-4 sm:p-6 transition-colors duration-150 ${
                   !notification.isRead 
