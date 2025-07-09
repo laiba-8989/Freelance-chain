@@ -3,6 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { bidService } from '../../../services/api';
 import { ArrowLeft, File, Image, Video, FileText } from 'lucide-react';
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
 const BidDetails = () => {
   const { bidId } = useParams();
   const navigate = useNavigate();
@@ -45,8 +47,7 @@ const BidDetails = () => {
 
   const handleFileClick = (file) => {
     // Construct the full URL using the API base URL
-    const baseUrl = import.meta.env.VITE_REACT_APP_API_URL || 'http://localhost:5000';
-    const fileUrl = `${baseUrl}${file.url}`;
+    const fileUrl = `${API_URL}${file.url}`;
     
     console.log('Opening file from BidDetails:', {
       originalUrl: file.url,
