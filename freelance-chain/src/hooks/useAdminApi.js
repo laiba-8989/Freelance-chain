@@ -4,7 +4,7 @@ import { toast } from 'react-hot-toast';
 import { useWeb3 } from '../context/Web3Context';
 import { useState, useEffect } from 'react';
 
-const API_BASE_URL = 'http://localhost:5000/api';
+const API_BASE_URL = 'https://freelance-chain-production.up.railway.app/api';
 
 export const useAdminApi = () => {
   const { account } = useWeb3();
@@ -39,7 +39,7 @@ export const useAdminApi = () => {
     return useQuery({
       queryKey: ['adminDashboardStats'],
       queryFn: async () => {
-        const response = await axios('http://localhost:5000/api/admin/dashboard/stats', getRequestConfig());
+        const response = await axios('${API_BASE_URL}/api/admin/dashboard/stats', getRequestConfig());
         return response.data.data;
       },
       enabled: !!account
@@ -50,7 +50,7 @@ export const useAdminApi = () => {
     return useQuery({
       queryKey: ['adminUsers', page, filters],
       queryFn: async () => {
-        const response = await axios('http://localhost:5000/api/admin/users', {
+        const response = await axios('${API_BASE_URL}/api/admin/users', {
           ...getRequestConfig(),
           params: {
             ...getRequestConfig().params,
@@ -69,7 +69,7 @@ export const useAdminApi = () => {
     return useMutation({
       mutationFn: async ({ userId, status }) => {
         const response = await axios(
-          `http://localhost:5000/api/admin/users/${userId}/status`,
+          `${API_BASE_URL}/api/admin/users/${userId}/status`,
           getRequestConfig('patch', { status })
         );
         return response.data;
@@ -87,7 +87,7 @@ export const useAdminApi = () => {
     return useQuery({
       queryKey: ['adminJobs', page, filters],
       queryFn: async () => {
-        const response = await axios('http://localhost:5000/api/admin/jobs', {
+        const response = await axios('${API_BASE_URL}/api/admin/jobs', {
           ...getRequestConfig(),
           params: {
             ...getRequestConfig().params,
@@ -106,7 +106,7 @@ export const useAdminApi = () => {
     return useMutation({
       mutationFn: async ({ jobId, status }) => {
         const response = await axios(
-          `http://localhost:5000/api/admin/jobs/${jobId}/status`,
+          `${API_BASE_URL}/api/admin/jobs/${jobId}/status`,
           getRequestConfig('patch', { status })
         );
         return response.data;
@@ -124,7 +124,7 @@ export const useAdminApi = () => {
     return useQuery({
       queryKey: ['adminContracts', page, filters],
       queryFn: async () => {
-        const response = await axios('http://localhost:5000/api/admin/contracts', {
+        const response = await axios('${API_BASE_URL}/api/admin/contracts', {
           ...getRequestConfig(),
           params: {
             ...getRequestConfig().params,
@@ -220,7 +220,7 @@ export const useAdminApi = () => {
     return useMutation({
       mutationFn: async (notificationData) => {
         const response = await axios(
-          'http://localhost:5000/api/admin/notifications',
+          '${API_BASE_URL}/api/admin/notifications',
           getRequestConfig('post', notificationData)
         );
         return response.data;
@@ -238,7 +238,7 @@ export const useAdminApi = () => {
     return useMutation({
       mutationFn: async (type) => {
         const response = await axios(
-          `http://localhost:5000/api/admin/export/${type}`,
+          `${API_BASE_URL}/api/admin/export/${type}`,
           getRequestConfig()
         );
         return response.data;
