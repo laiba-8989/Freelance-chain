@@ -8,33 +8,61 @@ const { ADMIN_WALLET_ADDRESSES } = require('../middleware/adminAuth');
 const crypto = require('crypto');
 const Web3 = require('web3');
 const router = express.Router();
-// Initialize Web3 with Infura provider (or any public Ethereum node)
-const web3 = new Web3('https://mainnet.infura.io/v3/YOUR_INFURA_PROJECT_ID');
+
+// Initialize Web3 with Vanguard network
+const web3 = new Web3('https://rpc-vanguard.vanarchain.com');
+
 // Generate a random nonce
 const generateNonce = () => crypto.randomBytes(16).toString('hex');
 
 // Helper function to check if a wallet is an admin
 const isAdminWallet = (walletAddress) => {
     if (!walletAddress) return false;
-    return ADMIN_WALLET_ADDRESSES.some(
-        adminAddress => adminAddress.toLowerCase() === walletAddress.toLowerCase()
-    );
+    
+    // Debug logging
+    console.log('🔍 Checking admin wallet:', {
+        walletAddress,
+        ADMIN_WALLET_ADDRESSES: ADMIN_WALLET_ADDRESSES,
+        isArray: Array.isArray(ADMIN_WALLET_ADDRESSES),
+        length: ADMIN_WALLET_ADDRESSES?.length
+    });
+    
+    // Ensure ADMIN_WALLET_ADDRESSES is an array
+    if (!Array.isArray(ADMIN_WALLET_ADDRESSES)) {
+        console.error('❌ ADMIN_WALLET_ADDRESSES is not an array:', ADMIN_WALLET_ADDRESSES);
+        return false;
+    }
+    
+    return ADMIN_WALLET_ADDRESSES.some(adminAddress => {
+        // Ensure adminAddress is a string before calling toLowerCase
+        if (typeof adminAddress !== 'string') {
+            console.error('❌ Invalid admin address (not a string):', adminAddress);
+            return false;
+        }
+        return adminAddress.toLowerCase() === walletAddress.toLowerCase();
+    });
 };
 
 // MetaMask Login: Step 1 - Request Nonce
 router.post('/metamask/request', async (req, res) => {
+    console.log('🔐 MetaMask request received:', req.body);
+    
     const { walletAddress } = req.body;
 
     if (!walletAddress) {
+        console.log('❌ No wallet address provided');
         return res.status(400).json({ message: 'Wallet address required' });
     }
 
     try {
         const normalizedAddress = walletAddress.toLowerCase();
+        console.log('🔍 Looking up user with address:', normalizedAddress);
+        
         let user = await User.findOne({ walletAddress: normalizedAddress });
 
         // If the user does not exist, create a new entry
         if (!user) {
+            console.log('👤 Creating new user for address:', normalizedAddress);
             user = new User({ 
                 walletAddress: normalizedAddress,
                 nonce: generateNonce(),
@@ -42,17 +70,24 @@ router.post('/metamask/request', async (req, res) => {
                 role: isAdminWallet(normalizedAddress) ? 'admin' : undefined
             });
             await user.save();
+            console.log('✅ New user created with role:', user.role);
         } else {
+            console.log('👤 Updating existing user:', user._id);
             // Update the nonce for security
             user.nonce = generateNonce();
             await user.save();
+            console.log('✅ Nonce updated for existing user');
         }
 
-        console.log('Nonce generated for:', normalizedAddress, user.nonce); // Debugging
+        console.log('🎯 Nonce generated for:', normalizedAddress, user.nonce);
         res.status(200).json({ nonce: user.nonce });
     } catch (error) {
-        console.error('Error in /metamask/request:', error); // Debugging
-        res.status(500).json({ message: 'Server error', error: error.message });
+        console.error('❌ Error in /metamask/request:', error);
+        res.status(500).json({ 
+            message: 'Server error', 
+            error: error.message,
+            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        });
     }
 });
 
