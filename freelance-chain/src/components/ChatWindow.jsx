@@ -7,6 +7,8 @@ import { getSocket, sendSocketMessage } from '../services/socket';
 import { Link } from 'react-router-dom';
 import Avatar from './Avatar';
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
 const ChatWindow = ({ conversationId, currentUser, otherUser }) => {
   const [messages, setMessages] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -137,7 +139,7 @@ const ChatWindow = ({ conversationId, currentUser, otherUser }) => {
           className="relative shrink-0"
         >
           <Avatar 
-            src={`http://localhost:5000${userDetails.profileImage}`}
+            src={userDetails.profileImage ? `${API_URL}${userDetails.profileImage}` : undefined}
             alt={userDetails.name || 'User'}
             className="w-10 h-10"
           />
