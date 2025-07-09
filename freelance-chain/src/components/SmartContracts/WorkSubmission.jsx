@@ -7,7 +7,7 @@ import { submitWorkOnChain } from '../../services/ContractOnChainService';
 import { Upload, FileText, AlertCircle, Download } from 'lucide-react';
 
 const getBackendFileUrl = (hash) => {
-    const API_URL = import.meta.env.VITE_REACT_APP_API_URL || 'http://localhost:5000';
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
     return `${API_URL}/api/ipfs/download/${encodeURIComponent(hash)}`;
 };
 
