@@ -110,9 +110,11 @@ import React, { useState, useRef } from 'react';
 import { toast } from 'sonner';
 import { uploadProfileImage, removeProfileImage } from '../services/api';
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
 const ProfileImageUpload = ({ currentImage, onSuccess, className = '' }) => {
   const [isUploading, setIsUploading] = useState(false);
-  const [previewUrl, setPreviewUrl] = useState(currentImage ? `http://localhost:5000${currentImage}` : null);
+  const [previewUrl, setPreviewUrl] = useState(currentImage ? `${API_URL}${currentImage}` : null);
   const fileInputRef = useRef(null);
 
   const handleFileChange = (event) => {
@@ -153,7 +155,7 @@ const ProfileImageUpload = ({ currentImage, onSuccess, className = '' }) => {
       const response = await uploadProfileImage(file);
       if (response.data.profileImage) {
         toast.success('Profile image updated successfully!');
-        const fullImageUrl = `http://localhost:5000${response.data.profileImage}`;
+        const fullImageUrl = `${API_URL}${response.data.profileImage}`;
         setPreviewUrl(fullImageUrl);
         onSuccess(response.data.profileImage);
       }
@@ -161,7 +163,7 @@ const ProfileImageUpload = ({ currentImage, onSuccess, className = '' }) => {
       console.error('Error uploading image:', error);
       toast.error(error.response?.data?.message || 'Failed to upload image. Please try again.');
       // Reset preview to current image if upload fails
-      setPreviewUrl(currentImage ? `http://localhost:5000${currentImage}` : null);
+      setPreviewUrl(currentImage ? `${API_URL}${currentImage}` : null);
     } finally {
       setIsUploading(false);
       // Reset file input
@@ -252,7 +254,7 @@ const ProfileImageUpload = ({ currentImage, onSuccess, className = '' }) => {
           <button
             type="button"
             onClick={handleUpload}
-            disabled={isUploading || !previewUrl || (previewUrl === currentImage && `http://localhost:5000${currentImage}`)}
+            disabled={isUploading || !previewUrl || (previewUrl === currentImage && `${API_URL}${currentImage}`)}
             className={`w-full px-6 py-3 rounded-lg font-medium text-white transition-colors duration-300 ${
               isUploading 
                 ? 'bg-[#6D9773]/70 cursor-not-allowed' 
