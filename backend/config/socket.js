@@ -8,7 +8,10 @@ const initSocket = (server) => {
       origin: [
         process.env.FRONTEND_URL || "http://localhost:5173",
         "https://freelance-chain-m6q032ov0-laibas-projects-e61b3139.vercel.app",
-        "https://freelance-chain.vercel.app"
+        "https://freelance-chain-git-kashaf-laibas-projects-e61b3139.vercel.app",
+        "https://freelance-chain.vercel.app",
+        // Allow any Vercel subdomain for this project
+        /^https:\/\/freelance-chain.*\.vercel\.app$/
       ],
       methods: ["GET", "POST"],
       credentials: true
