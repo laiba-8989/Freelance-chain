@@ -66,6 +66,8 @@ const MyProjects = () => {
     return <div className="text-center py-12 text-red-500">Error: {error}</div>;
   }
 
+  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto">
@@ -118,7 +120,7 @@ const MyProjects = () => {
                   <div className="h-48 overflow-hidden">
                     {project.media[0].type === 'image' ? (
                       <img
-                        src={`${import.meta.env.VITE_REACT_APP_API_URL || 'http://localhost:5000'}${project.media[0].url}`}
+                        src={`${API_URL}${project.media[0].url}`}
                         alt={project.title}
                         className="w-full h-full object-cover"
                         onError={(e) => {
@@ -128,7 +130,7 @@ const MyProjects = () => {
                       />
                     ) : project.media[0].type === 'video' ? (
                       <video
-                        src={`${import.meta.env.VITE_REACT_APP_API_URL || 'http://localhost:5000'}${project.media[0].url}`}
+                        src={`${API_URL}${project.media[0].url}`}
                         className="w-full h-full object-cover"
                       />
                     ) : (
