@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useWeb3 } from '../../context/Web3Context';
 import axios from 'axios';
 import { toast } from 'react-hot-toast';
-
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 const ContractDetails = () => {
   const { contractId } = useParams();
   const navigate = useNavigate();
@@ -22,7 +22,7 @@ const ContractDetails = () => {
         }
 
         const response = await axios.get(
-          `http://localhost:5000/api/admin/contracts/${contractId}`,
+           `${API_URL}/api/admin/contracts/${contractId}`,
           {
             headers: {
               'Authorization': `Bearer ${token}`,
