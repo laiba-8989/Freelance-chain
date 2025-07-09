@@ -21,9 +21,10 @@
 // export const getPublicUserProfile = (userId) => 
 //   axios.get(`${BASE_URL}/profile/public/${userId}`);
 // src/api/profile.js
+// src/api/profile.js
 import axios from 'axios';
 
-const BASE_URL = 'http://localhost:5000';
+const BASE_URL = import.meta.env.VITE_API_URL || 'https://freelance-chain-production.up.railway.app';
 const authHeaders = (token) => ({
   headers: { Authorization: `Bearer ${token}` },
 });
@@ -42,3 +43,4 @@ export const uploadProfileImage = (file, token) => {
 
 export const getPublicUserProfile = (userId) => 
   axios.get(`${BASE_URL}/profile/public/${userId}`);
+
