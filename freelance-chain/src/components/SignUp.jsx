@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
 const SignUp = () => {
   const [walletAddress, setWalletAddress] = useState('');
   const [isConnected, setIsConnected] = useState(false);
@@ -31,7 +33,7 @@ const SignUp = () => {
         setIsConnected(true);
 
         // Check if the wallet address is already registered
-        const checkResponse = await axios.post('http://localhost:5000/auth/check-wallet', {
+        const checkResponse = await axios.post(`${API_URL}/auth/check-wallet`, {
           walletAddress: wallet.toLowerCase(),
         });
 
@@ -41,7 +43,7 @@ const SignUp = () => {
         }
 
         // Proceed with registration
-        const response = await axios.post('http://localhost:5000/auth/register', {
+        const response = await axios.post(`${API_URL}/auth/register`, {
           walletAddress: wallet.toLowerCase(),
         });
 
