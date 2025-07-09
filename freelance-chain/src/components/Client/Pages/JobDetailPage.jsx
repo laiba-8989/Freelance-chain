@@ -50,11 +50,12 @@ const JobDetail = () => {
     const fetchJobAndBids = async () => {
       try {
         // Fetch job details
-        const jobResponse = await axios.get(`http://localhost:5000/jobs/${id}`);
+          const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+        const jobResponse = await axios.get(`${API_URL}/jobs/${id}`);
         setJob(jobResponse.data);
 
         // Fetch bids with filters
-        const bidsResponse = await axios.get(`http://localhost:5000/bids/job/${id}`, {
+         const bidsResponse = await axios.get(`${API_URL}/bids/job/${id}`, {
           params: filters
         });
         setBids(bidsResponse.data);
@@ -70,11 +71,12 @@ const JobDetail = () => {
 
   const handleAcceptBid = async (bidId) => {
     try {
-      await axios.put(`http://localhost:5000/bids/${bidId}`, {
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      await axios.put(`${API_URL}/bids/${bidId}`, {
         status: 'accepted'
       });
       // Refresh bids after status change
-      const response = await axios.get(`http://localhost:5000/bids/job/${id}`);
+      const response = await axios.get(`${API_URL}/bids/job/${id}`);
       setBids(response.data);
     } catch (err) {
       setError('Failed to accept bid');
@@ -83,11 +85,12 @@ const JobDetail = () => {
 
   const handleRejectBid = async (bidId) => {
     try {
-      await axios.put(`http://localhost:5000/bids/${bidId}`, {
+     const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      await axios.put(`${API_URL}/bids/${bidId}`, {
         status: 'rejected'
       });
       // Refresh bids after status change
-      const response = await axios.get(`http://localhost:5000/bids/job/${id}`);
+      const response = await axios.get(`${API_URL}/bids/job/${id}`);
       setBids(response.data);
     } catch (err) {
       setError('Failed to reject bid');
