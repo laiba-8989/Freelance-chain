@@ -1,9 +1,10 @@
-import React, { useContext } from "react";
+import React, { useContext, useEffect } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster as HotToaster } from "react-hot-toast";
 import { Toaster as SonnerToaster } from "sonner";
 import * as Tooltip from '@radix-ui/react-tooltip';
+import axios from 'axios';
 
 import { AuthContext } from "./AuthContext";
 import { NotificationProvider } from "./context/NotificationContext";
@@ -47,8 +48,29 @@ import ProfileErrorBoundary from './components/ErrorBoundary';
 import NotificationPage from "./components/Client/Pages/Notification";
 import NotificationSettings from "./components/Client/Pages/NotificationSettings";
 import AdminRoutes from './components/Admin/AdminRoutes';
-
+import StatusPage from './components/StatusPage';
+// import TermsAndConditions from "./components/terms";
 const queryClient = new QueryClient();
+
+// Health check component
+const HealthCheck = () => {
+  useEffect(() => {
+    const checkBackendHealth = async () => {
+      try {
+        const apiUrl = import.meta.env.VITE_API_URL || 'https://freelance-chain-production.up.railway.app';
+        const response = await axios.get(`${apiUrl}/health`);
+        console.log('✅ Backend health check passed:', response.data);
+      } catch (error) {
+        console.error('❌ Backend health check failed:', error.message);
+        console.log('🔗 API URL being used:', import.meta.env.VITE_API_URL || 'https://freelance-chain-production.up.railway.app');
+      }
+    };
+
+    checkBackendHealth();
+  }, []);
+
+  return null;
+};
 
 // Protected Route component
 const ProtectedRoute = ({ children }) => {
@@ -76,6 +98,9 @@ const App = () => {
         <Web3Provider>
           <NotificationProvider>
             <ContractProvider>
+              {/* Health check on app load */}
+              <HealthCheck />
+              
               {/* Notification systems */}
               <HotToaster position="top-right" />
               <SonnerToaster richColors closeButton position="bottom-right" />
@@ -92,6 +117,9 @@ const App = () => {
                   <Route path="/jobs/:id" element={<JobDetail />} />
                   <Route path="/projects/:id" element={<ProjectDetails />} />
                   <Route path="/profile/public/:userId" element={<PublicProfilePage />} />
+                  <Route path="/status" element={<StatusPage />} />
+
+                  {/* <Route path='/terms' element={<TermsAndConditions/>}/> */}
 
                   {/* Protected Routes */}
                   <Route path="/createproject" element={
