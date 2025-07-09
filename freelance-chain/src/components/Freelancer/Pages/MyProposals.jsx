@@ -52,8 +52,8 @@ const MyProposals = () => {
 
   const handleFileClick = (file) => {
     // Construct the full URL using the API base URL
-    const baseUrl = import.meta.env.VITE_REACT_APP_API_URL || 'http://localhost:5000';
-    const fileUrl = `${baseUrl}${file.url}`;
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+    const fileUrl = `${API_URL}${file.url}`;
     
     console.log('Opening file:', {
       originalUrl: file.url,
@@ -151,7 +151,7 @@ const MyProposals = () => {
                       >
                         {file.type === 'image' ? (
                           <img
-                            src={`${import.meta.env.VITE_REACT_APP_API_URL || 'http://localhost:5000'}${file.url}`}
+                            src={`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${file.url}`}
                             alt={file.name}
                             className="h-8 w-8 object-cover rounded mr-2"
                           />
