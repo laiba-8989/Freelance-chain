@@ -47,7 +47,7 @@ const NotificationPage = () => {
         <div className="flex items-center space-x-2">
           {notification.senderId.profileImage ? (
             <img
-              src={`http://localhost:5000${notification.senderId.profileImage}`}
+              src={`${API_URL}${notification.senderId.profileImage}`}
               alt={notification.senderId.name || 'User'}
               className="w-8 h-8 rounded-full object-cover border-2 border-[#BB8A52]"
             />
