@@ -248,6 +248,8 @@ const EditProject = () => {
     );
   }
 
+  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-3xl mx-auto">
@@ -406,13 +408,13 @@ const EditProject = () => {
                       <div className="aspect-w-1 aspect-h-1 w-full overflow-hidden rounded-lg bg-gray-100 flex items-center justify-center">
                         {mediaItem.type && mediaItem.type.startsWith('image') ? (
                           <img
-                            src={mediaItem.url.startsWith('blob:') ? mediaItem.url : `${import.meta.env.VITE_REACT_APP_API_URL || 'http://localhost:5000'}${mediaItem.url}`}
+                            src={mediaItem.url.startsWith('blob:') ? mediaItem.url : `${API_URL}${mediaItem.url}`}
                             alt={mediaItem.name || 'Project media'}
                             onError={() => handleImageError(index)}
                             className="h-full w-full object-cover object-center"
                           />
                         ) : mediaItem.type === 'video' ? (
-                           <video controls src={mediaItem.url.startsWith('blob:') ? mediaItem.url : `${import.meta.env.VITE_REACT_APP_API_URL || 'http://localhost:5000'}${mediaItem.url}`} className="h-full w-full object-cover object-center" />
+                           <video controls src={mediaItem.url.startsWith('blob:') ? mediaItem.url : `${API_URL}${mediaItem.url}`} className="h-full w-full object-cover object-center" />
                         ) : (
                            <div className="flex flex-col items-center p-4">
                               <svg className="h-8 w-8 text-gray-400 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
