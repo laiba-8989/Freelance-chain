@@ -16,6 +16,14 @@ const fs = require('fs');
 const app = express();
 const server = http.createServer(app);
 
+// Log environment variables for debugging (without sensitive data)
+console.log('Environment Configuration:');
+console.log('- NODE_ENV:', process.env.NODE_ENV);
+console.log('- PORT:', process.env.PORT);
+console.log('- MONGO_URI:', process.env.MONGO_URI ? 'Set' : 'Not set');
+console.log('- VANGUARD_RPC_URL:', process.env.VANGUARD_RPC_URL || 'Using default');
+console.log('- FRONTEND_URL:', process.env.FRONTEND_URL || 'Using default');
+
 // Create uploads directory if it doesn't exist
 const uploadsDir = path.join(__dirname, 'uploads');
 const bidsDir = path.join(uploadsDir, 'bids');
@@ -27,9 +35,26 @@ if (!fs.existsSync(bidsDir)) {
   fs.mkdirSync(bidsDir, { recursive: true });
 }
 
-// Initialize Web3 with Ganache
-const ganacheUrl = process.env.GANACHE_URL || 'http://127.0.0.1:7545';
-const web3 = new Web3(new Web3.providers.HttpProvider(ganacheUrl));
+// Initialize Web3 with Vanguard Network
+const vanguardRpcUrl = process.env.VANGUARD_RPC_URL || 'https://rpc-vanguard.vanarchain.com';
+const web3 = new Web3(new Web3.providers.HttpProvider(vanguardRpcUrl));
+
+// Test Web3 connection
+web3.eth.net.isListening()
+  .then(() => {
+    console.log('✅ Web3 connected successfully to Vanguard network');
+    return web3.eth.net.getId();
+  })
+  .then((networkId) => {
+    console.log(`🌐 Connected to network ID: ${networkId}`);
+    if (networkId !== 78600) {
+      console.warn(`⚠️  Warning: Expected network ID 78600 (Vanguard), but got ${networkId}`);
+    }
+  })
+  .catch((error) => {
+    console.error('❌ Web3 connection failed:', error.message);
+    console.log('⚠️  Continuing without blockchain functionality...');
+  });
 
 // Middleware
 app.use(express.json({ limit: '50mb' }));
@@ -91,10 +116,7 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
 }));
 
 // Database connection
-
 mongoose.connect(process.env.MONGO_URI, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
     retryWrites: true,
     w: 'majority'
 })
@@ -172,9 +194,11 @@ app.set('io', io);
 // Server startup
 const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
-    console.log(`Blockchain connected to: ${ganacheUrl}`);
-    console.log(`Allowed origins: ${process.env.FRONTEND_URL || 'http://localhost:5173'}`);
+    console.log('🚀 Server started successfully!');
+    console.log(`📍 Server running on port ${PORT}`);
+    console.log(`🔗 Blockchain RPC: ${vanguardRpcUrl}`);
+    console.log(`🌍 Allowed origins: ${process.env.FRONTEND_URL || 'http://localhost:5173'}`);
+    console.log(`📊 Health check: http://localhost:${PORT}/health`);
 });
 
 // Handle shutdown gracefully
