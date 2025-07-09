@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_URL = import.meta.env.VITE_REACT_APP_API_URL || 'http://localhost:5000';
+const API_URL = import.meta.env.VITE_REACT_APP_API_URL || 'https://freelance-chain-production.up.railway.app';
 
 // This function sends a file to the backend and expects the IPFS hash in the response
 export const uploadToIPFS = async (file) => {
