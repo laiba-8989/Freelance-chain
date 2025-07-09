@@ -64,17 +64,44 @@ web3.eth.net.isListening()
 // Middleware
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
+// Add CORS debugging middleware
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  console.log(`🌐 CORS Request from: ${origin}`);
+  console.log(`📋 Request method: ${req.method}`);
+  console.log(`🔗 Request path: ${req.path}`);
+  next();
+});
+
 app.use(cors({
-    origin: [
-        process.env.FRONTEND_URL || 'http://localhost:5173',
-        'https://freelance-chain-m6q032ov0-laibas-projects-e61b3139.vercel.app',
-        'https://freelance-chain.vercel.app'
-    ],
+    origin: function (origin, callback) {
+        // Allow requests with no origin (like mobile apps or curl requests)
+        if (!origin) return callback(null, true);
+        
+        const allowedOrigins = [
+            process.env.FRONTEND_URL || 'http://localhost:5173',
+            'https://freelance-chain-m6q032ov0-laibas-projects-e61b3139.vercel.app',
+            'https://freelance-chain-git-kashaf-laibas-projects-e61b3139.vercel.app',
+            'https://freelance-chain.vercel.app'
+        ];
+        
+        // Check if origin is in allowed list or matches Vercel pattern
+        const isAllowed = allowedOrigins.includes(origin) || 
+                         /^https:\/\/freelance-chain.*\.vercel\.app$/.test(origin);
+        
+        console.log(`🔍 CORS check for ${origin}: ${isAllowed ? '✅ Allowed' : '❌ Blocked'}`);
+        
+        if (isAllowed) {
+            callback(null, true);
+        } else {
+            callback(new Error('Not allowed by CORS'));
+        }
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'x-admin-wallet'],
     exposedHeaders: ['Content-Range', 'X-Content-Range']
-   
 }));
 
 // Make Web3 available to routes
