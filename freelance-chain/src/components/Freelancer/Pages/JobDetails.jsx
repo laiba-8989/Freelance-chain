@@ -4,6 +4,8 @@ import { useParams, Link } from 'react-router-dom';
 import { format } from 'date-fns';
 import BidForm from './BidForm';
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
 const JobDetail = () => {
   const { id } = useParams();
   const [job, setJob] = useState(null);
@@ -14,7 +16,7 @@ const JobDetail = () => {
   useEffect(() => {
     const fetchJob = async () => {
       try {
-        const response = await axios.get(`http://localhost:5000/jobs/${id}`);
+        const response = await axios.get(`${API_URL}/jobs/${id}`);
         setJob(response.data);
       } catch (error) {
         console.error('Error fetching job details:', error);
