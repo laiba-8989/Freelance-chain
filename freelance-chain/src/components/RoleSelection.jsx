@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
 const RoleSelection = () => {
   const [role, setRole] = useState('');
   const [name, setName] = useState('');
@@ -28,7 +30,7 @@ const RoleSelection = () => {
       navigate('/signin'); // Redirect to the login page
     }
     try {
-      const response = await axios.post('http://localhost:5000/auth/select-role', {
+      const response = await axios.post(`${API_URL}/auth/select-role`, {
         userId,
         role,
         name,
