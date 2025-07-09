@@ -1,5 +1,7 @@
 import { io } from 'socket.io-client';
 
+const SOCKET_URL = import.meta.env.VITE_API_URL || 'https://freelance-chain-production.up.railway.app';
+
 let socket = null;
 
 // Initialize socket connection
@@ -12,7 +14,7 @@ export const initSocket = (userId) => {
   console.log('Initializing socket connection for user:', userId);
   
   // Create socket with more robust configuration
-  socket = io('http://localhost:5000', {
+  socket = io(SOCKET_URL, {
     transports: ['websocket', 'polling'], // Allow both websocket and polling
     autoConnect: true,
     reconnection: true,
@@ -23,6 +25,9 @@ export const initSocket = (userId) => {
     withCredentials: true, // Important for CORS
     extraHeaders: {
       'Access-Control-Allow-Origin': '*'
+    },
+    auth: {
+      userId: userId
     }
   });
 
@@ -106,3 +111,4 @@ export default {
   sendSocketMessage,
   isSocketConnected
 };
+
