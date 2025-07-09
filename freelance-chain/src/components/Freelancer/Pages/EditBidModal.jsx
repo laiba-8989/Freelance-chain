@@ -16,6 +16,8 @@ const EditBidModal = ({ bid, onClose, onSubmit }) => {
   const [existingFiles, setExistingFiles] = useState(bid.bidMedia || []);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
   const handleFileSelect = (e) => {
     const files = Array.from(e.target.files);
     const validFiles = files.filter(file => {
@@ -57,10 +59,10 @@ const EditBidModal = ({ bid, onClose, onSubmit }) => {
 
   const handleFileClick = (file) => {
     if (file.type === 'image' || file.type === 'pdf') {
-      window.open(`${import.meta.env.VITE_REACT_APP_API_URL || 'http://localhost:5000'}${file.url}`, '_blank');
+      window.open(`${API_URL}${file.url}`, '_blank');
     } else {
       const link = document.createElement('a');
-      link.href = `${import.meta.env.VITE_REACT_APP_API_URL || 'http://localhost:5000'}${file.url}`;
+      link.href = `${API_URL}${file.url}`;
       link.download = file.name;
       document.body.appendChild(link);
       link.click();
@@ -231,7 +233,7 @@ const EditBidModal = ({ bid, onClose, onSubmit }) => {
                         >
                           {file.type === 'image' ? (
                             <img 
-                              src={`${import.meta.env.VITE_REACT_APP_API_URL || 'http://localhost:5000'}${file.url}`} 
+                              src={`${API_URL}${file.url}`} 
                               alt={file.name} 
                               className="h-10 w-10 object-cover rounded mr-2"
                             />
