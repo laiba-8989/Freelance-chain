@@ -3,7 +3,7 @@ import { useMutation } from '@tanstack/react-query';
 import axios from 'axios';
 import { toast } from 'react-hot-toast';
 import { useWeb3 } from '../../context/Web3Context';
-
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 const Notifications = () => {
   const { account } = useWeb3();
   const [notification, setNotification] = useState({
@@ -23,7 +23,7 @@ const Notifications = () => {
           console.warn("No token or account found, cannot fetch users for admin notifications.");
           return;
         }
-        const res = await axios.get('http://localhost:5000/api/admin/users', {
+        const res = await axios.get(`${API_URL}/api/admin/users`, {
           headers: { 
             'Authorization': `Bearer ${token}`,
             'x-admin-wallet': account.toLowerCase()
@@ -52,7 +52,7 @@ const Notifications = () => {
 
       try {
         const response = await axios.post(
-          'http://localhost:5000/api/admin/notifications',
+          `${API_URL}/api/admin/notifications`,
           payload,
           {
             headers: {
