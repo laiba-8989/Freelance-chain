@@ -1,6 +1,7 @@
 import axios from 'axios';
 
-const API_URL = import.meta.env.VITE_API_URL || 'https://freelance-chain-production.up.railway.app';
+
+const API_URL = 'https://freelance-chain-production.up.railway.app';
 console.log('API_URL used in api.js:', API_URL);
 
 // List of public paths that don't require authentication
