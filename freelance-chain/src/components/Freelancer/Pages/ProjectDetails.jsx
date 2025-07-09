@@ -95,7 +95,7 @@ const ProjectDetails = () => {
       </div>
     );
   }
-
+ const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-7xl mx-auto">
@@ -165,15 +165,15 @@ const ProjectDetails = () => {
               {/* Main Media Display - Adjusted to more professional proportions */}
               <div className="relative max-h-96 bg-gray-100">
                 {project.media[currentSlide].type === 'image' ? (
-                  <img
-                    src={`${import.meta.env.VITE_REACT_APP_API_URL || 'http://localhost:5000'}${project.media[currentSlide].url}`}
+                 <img
+                    src={`${API_URL}${project.media[currentSlide].url}`}
                     alt={project.media[currentSlide].name}
                     className="w-full h-full max-h-96 object-contain mx-auto cursor-pointer"
                     onClick={() => handleMediaClick(project.media[currentSlide])}
                   />
                 ) : project.media[currentSlide].type === 'video' ? (
-                  <video
-                    src={`${import.meta.env.VITE_REACT_APP_API_URL || 'http://localhost:5000'}${project.media[currentSlide].url}`}
+                   <video
+                    src={`${API_URL}${project.media[currentSlide].url}`}
                     controls
                     className="w-full h-full max-h-96 object-contain mx-auto"
                   />
@@ -185,7 +185,7 @@ const ProjectDetails = () => {
                       </svg>
                       <p className="mt-4 text-base font-medium text-gray-900">{project.media[currentSlide].name}</p>
                       <a
-                        href={`${import.meta.env.VITE_REACT_APP_API_URL || 'http://localhost:5000'}${project.media[currentSlide].url}`}
+                         href={`${API_URL}${project.media[currentSlide].url}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="mt-4 inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm font-medium text-white bg-[#6D9773] hover:bg-opacity-90 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#6D9773]"
@@ -245,8 +245,8 @@ const ProjectDetails = () => {
                   >
                     <div className="aspect-w-1 aspect-h-1">
                       {media.type === 'image' ? (
-                        <img
-                          src={`${import.meta.env.VITE_REACT_APP_API_URL || 'http://localhost:5000'}${media.url}`}
+                         <img
+                          src={`${API_URL}${media.url}`}
                           alt={media.name}
                           className="w-full h-full object-cover"
                         />
@@ -395,14 +395,14 @@ const ProjectDetails = () => {
             
             <div className="p-4">
               {selectedMedia.type === 'image' ? (
-                <img
-                  src={`${import.meta.env.VITE_REACT_APP_API_URL || 'http://localhost:5000'}${selectedMedia.url}`}
+                 <img
+                  src={`${API_URL}${selectedMedia.url}`}
                   alt={selectedMedia.name}
                   className="w-full h-auto max-h-[70vh] object-contain mx-auto"
                 />
               ) : selectedMedia.type === 'video' ? (
-                <video
-                  src={`${import.meta.env.VITE_REACT_APP_API_URL || 'http://localhost:5000'}${selectedMedia.url}`}
+                 <video
+                  src={`${API_URL}${selectedMedia.url}`}
                   controls
                   className="w-full h-auto max-h-[70vh] mx-auto"
                   autoPlay
@@ -415,8 +415,8 @@ const ProjectDetails = () => {
                   <h3 className="mt-4 text-xl font-bold text-gray-900">{selectedMedia.name}</h3>
                   <p className="mt-2 text-gray-500">Document Preview</p>
                   <div className="mt-6">
-                    <a
-                      href={`${import.meta.env.VITE_REACT_APP_API_URL || 'http://localhost:5000'}${selectedMedia.url}`}
+                     <a
+                      href={`${API_URL}${selectedMedia.url}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-[#6D9773] hover:bg-opacity-90 transition-all"
