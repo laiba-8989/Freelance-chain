@@ -13,6 +13,11 @@ const ipfsRoutes = require('./routes/ipfsRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const fs = require('fs');
 
+// Set NODE_ENV to production if not set (for Railway deployment)
+if (!process.env.NODE_ENV) {
+  process.env.NODE_ENV = 'production';
+}
+
 const app = express();
 const server = http.createServer(app);
 
