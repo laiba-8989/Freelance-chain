@@ -249,8 +249,6 @@
 // };
 
 // export default PublicProfilePage;
-
-// src/pages/PublicProfilePage.jsx
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -335,6 +333,8 @@ const PublicProfilePage = () => {
     );
   }
 
+  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-5xl mx-auto">
@@ -356,7 +356,7 @@ const PublicProfilePage = () => {
               <div className="flex-shrink-0 mx-auto md:mx-0">
                 {profile.profileImage ? (
                   <img
-                    src={`http://localhost:5000${profile.profileImage}`}
+                    src={`${API_URL}${profile.profileImage}`}
                     alt={profile.name || 'User'}
                     className="w-32 h-32 md:w-40 md:h-40 rounded-full object-cover border-4 border-white shadow-md"
                   />
