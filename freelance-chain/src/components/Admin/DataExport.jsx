@@ -4,6 +4,8 @@ import axios from 'axios';
 import { toast } from 'react-hot-toast';
 import { ArrowDownTrayIcon } from '@heroicons/react/24/outline';
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
 const DataExport = () => {
   const [exportType, setExportType] = useState('users');
   const [dateRange, setDateRange] = useState({
@@ -14,7 +16,7 @@ const DataExport = () => {
   const exportMutation = useMutation({
     mutationFn: async ({ type, startDate, endDate }) => {
       const response = await axios.get(
-        `http://localhost:5000/api/admin/export/${type}`,
+        `${API_URL}/api/admin/export/${type}`,
         {
           headers: {
             'Content-Type': 'application/json',
