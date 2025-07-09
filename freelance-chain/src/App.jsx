@@ -56,13 +56,24 @@ const queryClient = new QueryClient();
 const HealthCheck = () => {
   useEffect(() => {
     const checkBackendHealth = async () => {
+      const apiUrl = import.meta.env.VITE_API_URL || 'https://freelance-chain-production.up.railway.app';
+      
+      console.log('🔍 Environment Variable Check:');
+      console.log('- VITE_API_URL:', import.meta.env.VITE_API_URL);
+      console.log('- Using API URL:', apiUrl);
+      console.log('- Is localhost?', apiUrl.includes('localhost'));
+      
       try {
-        const apiUrl = import.meta.env.VITE_API_URL || 'https://freelance-chain-production.up.railway.app';
         const response = await axios.get(`${apiUrl}/health`);
         console.log('✅ Backend health check passed:', response.data);
       } catch (error) {
         console.error('❌ Backend health check failed:', error.message);
-        console.log('🔗 API URL being used:', import.meta.env.VITE_API_URL || 'https://freelance-chain-production.up.railway.app');
+        console.log('🔗 API URL being used:', apiUrl);
+        console.log('🌐 Error details:', {
+          status: error.response?.status,
+          statusText: error.response?.statusText,
+          data: error.response?.data
+        });
       }
     };
 
