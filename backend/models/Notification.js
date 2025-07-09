@@ -146,7 +146,7 @@ const notificationSettingsSchema = new mongoose.Schema({
 }, { timestamps: true });
 
 // Add index for better query performance
-notificationSettingsSchema.index({ userId: 1 });
+// notificationSettingsSchema.index({ userId: 1 });
 
 // Add method to check if a notification type is enabled
 notificationSettingsSchema.methods.isNotificationEnabled = function(category, type) {
