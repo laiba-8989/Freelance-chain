@@ -5,7 +5,11 @@ const notificationService = require("../services/notificationService");
 const initSocket = (server) => {
   const io = new Server(server, {
     cors: {
-      origin: process.env.FRONTEND_URL || "http://localhost:5173",
+      origin: [
+        process.env.FRONTEND_URL || "http://localhost:5173",
+        "https://freelance-chain-m6q032ov0-laibas-projects-e61b3139.vercel.app",
+        "https://freelance-chain.vercel.app"
+      ],
       methods: ["GET", "POST"],
       credentials: true
     }
