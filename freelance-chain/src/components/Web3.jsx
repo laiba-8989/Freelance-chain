@@ -9,7 +9,8 @@ if (isAdminWallet) {
     localStorage.setItem('isAdmin', 'true');
     // Verify admin status with backend
     try {
-        const adminResponse = await axios.get('http://localhost:5000/api/admin/verify', {
+        const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+        const adminResponse = await axios.get(`${API_URL}/api/admin/verify`, {
             headers: {
                 'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json'
