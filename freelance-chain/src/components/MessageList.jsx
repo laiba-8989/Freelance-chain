@@ -3,6 +3,8 @@ import { emitMessageRead } from '../socket';
 import { Link } from 'react-router-dom';
 import { cn } from '../lib/utils';
 
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
 const MessageList = ({ messages, currentUser, chatUsers }) => {
   const scrollRef = useRef();
   const messagesEndRef = useRef();
@@ -50,7 +52,7 @@ const MessageList = ({ messages, currentUser, chatUsers }) => {
 
   const getSenderProfileImage = (senderId) => {
     const user = chatUsers.find(user => user._id === senderId);
-    return user?.profileImage ? `http://localhost:5000${user.profileImage}` : null;
+    return user?.profileImage ? `${API_URL}${user.profileImage}` : null;
   };
 
   return (
