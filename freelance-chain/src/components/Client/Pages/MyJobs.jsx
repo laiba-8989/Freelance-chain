@@ -11,7 +11,7 @@ import axios from 'axios';
 import { ethers } from 'ethers';
 
 // Assuming API_URL is defined elsewhere or imported
-const API_URL = import.meta.env.VITE_REACT_APP_API_URL || 'http://localhost:5000';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 const MyJobs = () => {
   const { fetchContracts } = useContracts();
@@ -160,7 +160,7 @@ const MyJobs = () => {
 
   const handleFileClick = (file) => {
     // Construct the full URL using the API base URL
-    const baseUrl = import.meta.env.VITE_REACT_APP_API_URL || 'http://localhost:5000';
+    const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
     const fileUrl = `${baseUrl}${file.url}`;
     
     console.log('Opening file from MyJobs:', {
