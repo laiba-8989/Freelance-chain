@@ -110,8 +110,7 @@ import React, { useState, useRef } from 'react';
 import { toast } from 'sonner';
 import { uploadProfileImage, removeProfileImage } from '../services/api';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-
+const API_URL = 'https://freelance-chain-production.up.railway.app';
 const ProfileImageUpload = ({ currentImage, onSuccess, className = '' }) => {
   const [isUploading, setIsUploading] = useState(false);
   const [previewUrl, setPreviewUrl] = useState(currentImage ? `${API_URL}${currentImage}` : null);
