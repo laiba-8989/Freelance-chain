@@ -218,7 +218,7 @@ const BrowseProjects = () => {
                     <>
                       {project.media[currentSlide[project._id] || 0].type === 'image' ? (
                         <img
-                          src={`${API_URL}${project.media[currentSlide[project._id] || 0].url}`}
+                          src={`${'https://freelance-chain-production.up.railway.app'}${project.media[currentSlide[project._id] || 0].url}`}
                           alt={project.title}
                           className="w-full h-full object-cover"
                         />
