@@ -52,7 +52,7 @@ const MyProposals = () => {
 
   const handleFileClick = (file) => {
     // Construct the full URL using the API base URL
-    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+     const API_URL = 'https://freelance-chain-production.up.railway.app';
     const fileUrl = `${API_URL}${file.url}`;
     
     console.log('Opening file:', {
@@ -151,7 +151,7 @@ const MyProposals = () => {
                       >
                         {file.type === 'image' ? (
                           <img
-                            src={`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}${file.url}`}
+                            src={`${API_URL}${file.url}`}
                             alt={file.name}
                             className="h-8 w-8 object-cover rounded mr-2"
                           />
