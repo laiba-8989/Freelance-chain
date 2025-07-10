@@ -4,7 +4,7 @@ import { useParams, Link } from 'react-router-dom';
 import { format } from 'date-fns';
 import BidForm from './BidForm';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const API_URL = 'https://freelance-chain-production.up.railway.app';
 
 const JobDetail = () => {
   const { id } = useParams();
