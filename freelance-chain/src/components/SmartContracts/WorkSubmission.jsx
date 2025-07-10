@@ -6,6 +6,7 @@ import { toast } from 'react-hot-toast';
 import { submitWorkOnChain } from '../../services/ContractOnChainService';
 import { Upload, FileText, AlertCircle, Download } from 'lucide-react';
 
+ const API_URL = 'https://freelance-chain-production.up.railway.app';
 const getBackendFileUrl = (hash) => {
        const API_URL = 'https://freelance-chain-production.up.railway.app';
     return `${API_URL}/api/ipfs/download/${encodeURIComponent(hash)}`;
