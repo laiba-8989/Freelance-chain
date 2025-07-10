@@ -7,7 +7,7 @@ import { getSocket, sendSocketMessage } from '../services/socket';
 import { Link } from 'react-router-dom';
 import Avatar from './Avatar';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const API_URL = 'https://freelance-chain-production.up.railway.app';
 
 const ChatWindow = ({ conversationId, currentUser, otherUser }) => {
   const [messages, setMessages] = useState([]);
