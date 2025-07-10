@@ -248,7 +248,7 @@ const EditProject = () => {
     );
   }
 
-  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+  const API_URL = 'https://freelance-chain-production.up.railway.app';
 
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
