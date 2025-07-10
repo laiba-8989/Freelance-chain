@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+ const API_URL = 'https://freelance-chain-production.up.railway.app';
 
 const SignUp = () => {
   const [walletAddress, setWalletAddress] = useState('');
