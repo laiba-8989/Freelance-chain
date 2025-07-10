@@ -16,7 +16,7 @@ const EditBidModal = ({ bid, onClose, onSubmit }) => {
   const [existingFiles, setExistingFiles] = useState(bid.bidMedia || []);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+  const API_URL = 'https://freelance-chain-production.up.railway.app';
 
   const handleFileSelect = (e) => {
     const files = Array.from(e.target.files);
