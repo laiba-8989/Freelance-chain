@@ -11,7 +11,7 @@ import axios from 'axios';
 import { ethers } from 'ethers';
 
 // Assuming API_URL is defined elsewhere or imported
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const API_URL = 'https://freelance-chain-production.up.railway.app';
 
 const MyJobs = () => {
   const { fetchContracts } = useContracts();
