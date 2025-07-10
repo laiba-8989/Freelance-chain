@@ -9,7 +9,7 @@ if (isAdminWallet) {
     localStorage.setItem('isAdmin', 'true');
     // Verify admin status with backend
     try {
-        const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+         const API_URL = 'https://freelance-chain-production.up.railway.app';
         const adminResponse = await axios.get(`${API_URL}/api/admin/verify`, {
             headers: {
                 'Authorization': `Bearer ${token}`,
