@@ -25,7 +25,7 @@ const validateAddress = (address) => {
 
 // Add this helper at the top (after imports)
 const getBackendFileUrl = (hash) => {
-  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+   const API_URL = 'https://freelance-chain-production.up.railway.app';
   return `${API_URL}/api/ipfs/download/${encodeURIComponent(hash)}`;
 };
 
