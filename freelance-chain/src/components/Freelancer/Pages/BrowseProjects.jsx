@@ -218,7 +218,7 @@ const BrowseProjects = () => {
                     <>
                       {project.media[currentSlide[project._id] || 0].type === 'image' ? (
                         <img
-                          src={`${'https://freelance-chain-production.up.railway.app'}${project.media[currentSlide[project._id] || 0].url}`}
+                          src={`${import.meta.env.VITE_REACT_APP_API_URL || 'http://localhost:5000'}${project.media[currentSlide[project._id] || 0].url}`}
                           alt={project.title}
                           className="w-full h-full object-cover"
                         />
