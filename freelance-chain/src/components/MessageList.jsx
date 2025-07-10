@@ -3,7 +3,7 @@ import { emitMessageRead } from '../socket';
 import { Link } from 'react-router-dom';
 import { cn } from '../lib/utils';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const API_URL = 'https://freelance-chain-production.up.railway.app';
 
 const MessageList = ({ messages, currentUser, chatUsers }) => {
   const scrollRef = useRef();
