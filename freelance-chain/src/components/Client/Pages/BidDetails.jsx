@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { bidService } from '../../../services/api';
 import { ArrowLeft, File, Image, Video, FileText } from 'lucide-react';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const API_URL = 'https://freelance-chain-production.up.railway.app';
 
 const BidDetails = () => {
   const { bidId } = useParams();
