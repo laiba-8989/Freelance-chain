@@ -1,30 +1,3 @@
-// // JobDetailPage.js
-// import SubmitBidForm from '../../Freelancer/Pages/SubmitBidForm';    
-// import JobBidsList from './JobBidsList';
-
-// const JobDetailPage = () => {
-//   const { user } = useAuth(); // Your auth context
-//   const { jobId } = useParams();
-//   const [job, setJob] = useState(null);
-
-//   // Fetch job details...
-
-//   return (
-//     <div>
-//       {/* Job details rendering... */}
-      
-//       {user?.role === 'freelancer' && job?.status === 'open' ? (
-//         <SubmitBidForm jobId={jobId} />
-//       ) : user?.role === 'client' && job?.client === user.id ? (
-//         <JobBidsList jobId={jobId} />
-//       ) : null}
-//     </div>
-//   );
-// };
-
-
-
-
 
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
@@ -50,7 +23,7 @@ const JobDetail = () => {
     const fetchJobAndBids = async () => {
       try {
         // Fetch job details
-          const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+          const API_URL = 'https://freelance-chain-production.up.railway.app';
         const jobResponse = await axios.get(`${API_URL}/jobs/${id}`);
         setJob(jobResponse.data);
 
@@ -71,7 +44,7 @@ const JobDetail = () => {
 
   const handleAcceptBid = async (bidId) => {
     try {
-      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+      const API_URL = 'https://freelance-chain-production.up.railway.app';
       await axios.put(`${API_URL}/bids/${bidId}`, {
         status: 'accepted'
       });
@@ -85,7 +58,7 @@ const JobDetail = () => {
 
   const handleRejectBid = async (bidId) => {
     try {
-     const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+     const API_URL = 'https://freelance-chain-production.up.railway.app';
       await axios.put(`${API_URL}/bids/${bidId}`, {
         status: 'rejected'
       });
